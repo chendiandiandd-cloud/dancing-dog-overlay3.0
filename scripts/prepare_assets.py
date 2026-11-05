@@ -21,6 +21,9 @@ import re
 import shutil
 import subprocess
 import time
+import tempfile
+
+from lossless_cache import cache_metadata, write_npz_lzma
 
 import cv2
 import numpy as np
@@ -360,10 +363,22 @@ def prepare_one(source: Path, output: Path, dog_id: str, signature: str,
     protected_max = max(m["protected_green_pixels"] for m in metrics)
     if protected_max:
         warnings.append("Enclosed green pixels kept opaque; these may include real green details or enclosed screen holes.")
-    tmp = npz_path.with_suffix(".npz.tmp")
+    cache_work = SKILL_ROOT / "temp_data" / "lossless"
+    cache_work.mkdir(parents=True, exist_ok=True)
+    if cache_work.stat().st_dev != output.stat().st_dev:
+        # Keep custom --output-dir on another filesystem working; os.replace
+        # cannot cross devices. All temporary files still live under temp_data.
+        cache_work = output / "temp_data" / "lossless"
+        cache_work.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f"prepare-{dog_id}-", suffix=".npz", dir=cache_work)
+    os.close(fd)
+    tmp = Path(tmp_name)
     try:
-        with tmp.open("wb") as f:
-            np.savez_compressed(f, frames=frames)
+        write_npz_lzma(tmp, frames=frames)
+        with np.load(tmp, allow_pickle=False) as archive:
+            restored = archive["frames"]
+            if restored.dtype != frames.dtype or not np.array_equal(restored, frames):
+                raise ValueError("LZMA cache round-trip changed RGBA frames")
         os.replace(tmp, npz_path)
     finally:
         tmp.unlink(missing_ok=True)
@@ -413,6 +428,7 @@ def prepare_one(source: Path, output: Path, dog_id: str, signature: str,
                        "background_rgb_median": np.median([m["background_rgb"] for m in metrics], axis=0).tolist(),
                        "cycle_verified": False,
                        "warnings": warnings}}
+    dog.update(cache_metadata(frames))
     dog["quality"].update(check_archive(npz_path, dog))
     dog["processing_seconds"] = round(time.perf_counter() - started, 3)
     return dog, False
