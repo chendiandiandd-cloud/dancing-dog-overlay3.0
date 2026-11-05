@@ -1136,14 +1136,211 @@ class OverlayTests(unittest.TestCase):
                     self.assertEqual(call.args[6],args.anchor)
 
 
+class LosslessCacheTests(unittest.TestCase):
+    """Targeted codec/maintenance tests; no media fixture generation/rendering."""
+    def setUp(self):
+        import zipfile
+        from lossless_cache import sha256
+        work = ROOT/'temp_data/lossless'
+        work.mkdir(parents=True, exist_ok=True)
+        self.temp = tempfile.TemporaryDirectory(prefix='unit-', dir=work)
+        self.addCleanup(self.temp.cleanup)
+        self.base = Path(self.temp.name)
+        self.assets = self.base/'assets'
+        (self.assets/'dogs').mkdir(parents=True)
+        self.work = self.base/'work'
+        self.frames = np.zeros((12,96,96,4), np.uint8)
+        patch = np.random.default_rng(41).integers(0,256,(72,72,4),np.uint8)
+        patch[...,3] = 255
+        self.frames[:,12:84,12:84] = patch
+        self.path = self.assets/'dogs/dog_01.npz'
+        np.savez_compressed(self.path, frames=self.frames)
+        self.manifest_path = self.assets/'dog_manifest.json'
+        self.manifest = {'version':1,'dogs':[dict(
+            id='dog_01',file='dogs/dog_01.npz',frame_count=12,width=96,height=96,
+            fps=30.,anchor=[48.,84.],dominant_color=[111,122,133],
+            sha256=sha256(self.path),npz_bytes=self.path.stat().st_size,
+            source='source/dog_01.mp4',source_sha256='source-never-modified',
+            experimental_metadata={'keep':[1,2,3]})]}
+        self.save_manifest()
+
+    def save_manifest(self):
+        self.manifest_path.write_text(json.dumps(self.manifest),encoding='utf-8')
+
+    def test_01_repack_all_members_arrays_and_hidden_rgba(self):
+        import zipfile
+        from lossless_cache import compare_npz, repack_npz
+        # Include non-array bytes and a second safe NPY (including NaN).
+        import io
+        buffer = io.BytesIO()
+        np.save(buffer,np.array([1.,np.nan]),allow_pickle=False)
+        with zipfile.ZipFile(self.path,'a') as z:
+            z.writestr('note.txt',b'extra member content must survive\x00')
+            z.writestr('other.npy',buffer.getvalue())
+        target = self.base/'new.npz'
+        repack_npz(self.path,target)
+        result = compare_npz(self.path,target)
+        self.assertTrue(result['all_members_byte_identical'])
+        self.assertTrue(result['all_rgba_pixels_equal'])
+        self.assertEqual(len(result['old_members']),3)
+        self.assertEqual(len(result['arrays']),2)
+        self.assertEqual(len(result['frame_pixels_sha256']),12)
+
+    def test_02_manifest_preservation_and_idempotency(self):
+        from lossless_cache import compress_assets, cache_metadata_keys
+        before = json.loads(self.manifest_path.read_text())
+        first = compress_assets(self.assets,self.work)
+        self.assertGreater(first['saved_bytes'],0)
+        after = json.loads(self.manifest_path.read_text())
+        excluded = {'sha256','npz_bytes',*cache_metadata_keys()}
+        self.assertEqual({k:v for k,v in before['dogs'][0].items() if k not in excluded},
+                         {k:v for k,v in after['dogs'][0].items() if k not in excluded})
+        snapshot = [(p.read_bytes(),p.stat().st_mtime_ns) for p in (self.path,self.manifest_path)]
+        second = compress_assets(self.assets,self.work,self.work/'rerun.json')
+        self.assertTrue(second['dogs'][0]['skipped_already_lzma'])
+        self.assertEqual(second['saved_bytes'],0)
+        self.assertEqual(snapshot,[(p.read_bytes(),p.stat().st_mtime_ns) for p in (self.path,self.manifest_path)])
+
+    def test_03_existing_hash_mismatch_refuses(self):
+        from lossless_cache import compress_assets
+        self.manifest['dogs'][0]['sha256']='0'*64
+        self.save_manifest()
+        before = self.path.read_bytes(),self.manifest_path.read_bytes()
+        with self.assertRaisesRegex(ValueError,'hash/size mismatch'):
+            compress_assets(self.assets,self.work)
+        self.assertEqual(before,(self.path.read_bytes(),self.manifest_path.read_bytes()))
+
+    def test_04_corrupt_npz_even_matching_hash_refuses(self):
+        from lossless_cache import compress_assets,sha256
+        self.path.write_bytes(b'not a ZIP file')
+        self.manifest['dogs'][0].update(sha256=sha256(self.path),npz_bytes=self.path.stat().st_size)
+        self.save_manifest()
+        before=self.path.read_bytes(),self.manifest_path.read_bytes()
+        import zipfile
+        with self.assertRaises(zipfile.BadZipFile):
+            compress_assets(self.assets,self.work)
+        self.assertEqual(before,(self.path.read_bytes(),self.manifest_path.read_bytes()))
+
+    def test_05_failed_comparison_never_replaces(self):
+        from unittest.mock import patch
+        from lossless_cache import compress_assets
+        before=self.path.read_bytes(),self.manifest_path.read_bytes()
+        with patch('lossless_cache.compare_npz',side_effect=ValueError('injected validation failure')):
+            with self.assertRaisesRegex(ValueError,'validation failure'):
+                compress_assets(self.assets,self.work)
+        self.assertEqual(before,(self.path.read_bytes(),self.manifest_path.read_bytes()))
+
+    def test_06_manifest_install_failure_rolls_back_cache(self):
+        from unittest.mock import patch
+        from lossless_cache import compress_assets,atomic_json
+        before=self.path.read_bytes(),self.manifest_path.read_bytes()
+        def fail_manifest(path,value,work):
+            if path == self.manifest_path:
+                raise OSError('injected manifest install failure')
+            return atomic_json(path,value,work)
+        with patch('lossless_cache.atomic_json',side_effect=fail_manifest):
+            with self.assertRaisesRegex(OSError,'install failure'):
+                compress_assets(self.assets,self.work)
+        self.assertEqual(before,(self.path.read_bytes(),self.manifest_path.read_bytes()))
+
+    def test_07_pickle_and_duplicate_members_refused(self):
+        import zipfile,warnings
+        from lossless_cache import inspect_npz
+        bad=self.base/'pickle.npz'
+        np.savez_compressed(bad,frames=self.frames,unsafe=np.array([{}],dtype=object))
+        with self.assertRaises(ValueError): inspect_npz(bad)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore',UserWarning)
+            with zipfile.ZipFile(self.path,'a') as z: z.writestr('frames.npy',b'bad duplicate')
+        with self.assertRaisesRegex(ValueError,'duplicate'): inspect_npz(self.path)
+
+    def test_08_new_preparation_writer_is_lzma_and_pickle_free(self):
+        import zipfile
+        from prepare_assets import write_npz_lzma
+        target=self.base/'fresh.npz'
+        write_npz_lzma(target,frames=self.frames)
+        with zipfile.ZipFile(target) as z:
+            self.assertEqual([i.compress_type for i in z.infolist()],[14])
+        with np.load(target,allow_pickle=False) as z:
+            np.testing.assert_array_equal(z['frames'],self.frames)
+        with self.assertRaises(ValueError):
+            write_npz_lzma(self.base/'unsafe.npz',frames=np.array([{}],dtype=object))
+
+    def test_09_existing_decoded_hash_mismatch_refuses(self):
+        from lossless_cache import compress_assets
+        self.manifest['dogs'][0]['decoded_frames_sha256']='0'*64
+        self.save_manifest()
+        before=self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError,'Decoded frames hash mismatch'):
+            compress_assets(self.assets,self.work)
+        self.assertEqual(before,self.path.read_bytes())
+
+    def test_10_all_16_lzma_caches_load_via_unchanged_engine(self):
+        import zipfile
+        from overlay_core import DogLibrary
+        from lossless_cache import sha256,frames_hash,COMPRESSION
+        library=DogLibrary(ROOT/'assets')
+        self.assertEqual(len(library.entries),16)
+        total=0
+        for dog_id,entry in library.entries.items():
+            path=ROOT/'assets'/entry['file']
+            with zipfile.ZipFile(path) as z:
+                self.assertTrue(all(i.compress_type==14 for i in z.infolist()))
+            self.assertEqual(sha256(path),entry['sha256'])
+            self.assertEqual(path.stat().st_size,entry['npz_bytes'])
+            self.assertEqual(entry['compression'],COMPRESSION)
+            dog=library.load(dog_id)
+            self.assertEqual(dog['frames'].shape,(entry['frame_count'],entry['height'],entry['width'],4))
+            self.assertEqual(frames_hash(dog['frames']),entry['decoded_frames_sha256'])
+            total+=entry['frame_count']
+        self.assertEqual(total,827)
+
+
+    def test_11_real_pixel_change_is_rejected(self):
+        from lossless_cache import write_npz_lzma,compare_npz
+        changed=self.frames.copy()
+        changed[0,0,0,0]=1  # Even RGB beneath zero alpha is protected.
+        target=self.base/'changed.npz'
+        write_npz_lzma(target,frames=changed)
+        with self.assertRaisesRegex(ValueError,'member content'):
+            compare_npz(self.path,target)
+
+    def test_12_entire_batch_preflight_before_first_replacement(self):
+        import copy
+        from lossless_cache import compress_assets,sha256
+        bad=self.assets/'dogs/dog_02.npz'
+        bad.write_bytes(b'broken')
+        second=copy.deepcopy(self.manifest['dogs'][0])
+        second.update(id='dog_02',file='dogs/dog_02.npz',sha256=sha256(bad),npz_bytes=bad.stat().st_size)
+        self.manifest['dogs'].append(second)
+        self.save_manifest()
+        before=self.path.read_bytes(),bad.read_bytes(),self.manifest_path.read_bytes()
+        import zipfile
+        with self.assertRaises(zipfile.BadZipFile): compress_assets(self.assets,self.work)
+        self.assertEqual(before,(self.path.read_bytes(),bad.read_bytes(),self.manifest_path.read_bytes()))
+
+    def test_13_concurrent_maintenance_lock_refuses(self):
+        from lossless_cache import compress_assets
+        self.work.mkdir()
+        lock=self.work/'maintenance.lock'
+        lock.write_bytes(b'other maintenance')
+        with self.assertRaises(FileExistsError): compress_assets(self.assets,self.work)
+        self.assertEqual(lock.read_bytes(),b'other maintenance')
+
+
 def main():
     a=argparse.ArgumentParser(description=__doc__)
     a.add_argument('--report',default=str(ROOT/'temp_data/test_results.json'))
     a.add_argument('--real-summary',help='optional seed42/hd eight-real-input batch summary for functional regression')
+    a.add_argument('--lossless-only',action='store_true',help='only NPZ codec/maintenance tests; never generate media or render')
     args=a.parse_args()
     OverlayTests.real_summary=args.real_summary
     start=time.perf_counter()
-    r=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromTestCase(OverlayTests))
+    suite=unittest.TestSuite()
+    if not args.lossless_only:
+        suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(OverlayTests))
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(LosslessCacheTests))
+    r=unittest.TextTestRunner(verbosity=2).run(suite)
     report={'ok':r.wasSuccessful(),'tests_run':r.testsRun,'failures':len(r.failures),
             'errors':len(r.errors),'elapsed_seconds':round(time.perf_counter()-start,3),
             'details':[{'test':str(t),'trace':msg} for t,msg in r.failures+r.errors]}
