@@ -39,7 +39,7 @@
         169,
         43
       ],
-      "sha256": "572e22e25fa847ff818ac275702cc4231ed15b1e1d40a70402932803a4742a06",
+      "sha256": "10a386ef1da47b05d8a01f9d80a6021ea4b6f2c71189ce784532c4474a303ecc",
       "source": "source/dog_01.mp4",
       "source_sha256": "c50f149ae5c63bf8ceffcfc5f4911de423b6656ae960c5b5b314120abb883f74",
       "original_filename": "01_动态素材.mp4",
@@ -86,7 +86,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 6277409,
+      "npz_bytes": 3243079,
       "source_bytes": 113185,
       "quality": {
         "all_frames_inside_union": true,
@@ -114,7 +114,15 @@
         "soft_alpha_pixels": 280321,
         "uncompressed_bytes": 53067840
       },
-      "processing_seconds": 9.241
+      "processing_seconds": 9.241,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "8061c2774a928699a3f2b393abb1bbe014eff621f860ccf70062964a53d29b5f",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_02",
@@ -154,7 +162,7 @@
         72,
         3
       ],
-      "sha256": "e9805e5b228bc7cc27fe1453fea36f6541f62befb6ed150e812f3fb5fa4e442f",
+      "sha256": "5fa8a9362959a6f312f54e66f1f7d7bed8e92999f8e71a025605d4ffcfa2928f",
       "source": "source/dog_02.mp4",
       "source_sha256": "76caf61129fe79f4e125b4efba5f4a7a66365e9f0b14c363e39dbf515ce16c31",
       "original_filename": "02_动态素材.mp4",
@@ -201,7 +209,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 7990314,
+      "npz_bytes": 2388080,
       "source_bytes": 126938,
       "quality": {
         "all_frames_inside_union": true,
@@ -229,7 +237,15 @@
         "soft_alpha_pixels": 315902,
         "uncompressed_bytes": 84907200
       },
-      "processing_seconds": 11.23
+      "processing_seconds": 11.23,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "4ac1c0f87878f58a4159a83ba10d63b4a18b2f784d0b9f7579a7c75dd2801be7",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_03",
@@ -269,7 +285,7 @@
         108,
         1
       ],
-      "sha256": "84afb5f261e6db4052cdd5b0e2139317af2cfc632feb1ed5143d790cd62101a6",
+      "sha256": "b7cc89ed245d2d3061129758d54ee625e63370b9453cd59909c610d7bc2e6096",
       "source": "source/dog_03.mp4",
       "source_sha256": "98c9e9c0fa354d88a1b602b3aee47899cf4a5ed6d02a9a098711d8f29c06612a",
       "original_filename": "03_动态素材.mp4",
@@ -316,7 +332,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 4311573,
+      "npz_bytes": 1582560,
       "source_bytes": 86047,
       "quality": {
         "all_frames_inside_union": true,
@@ -344,7 +360,15 @@
         "soft_alpha_pixels": 221184,
         "uncompressed_bytes": 35997840
       },
-      "processing_seconds": 8.876
+      "processing_seconds": 8.876,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "58171b139835d03d9c036bf1018145df67e15aee816c3496dc27e1737c581250",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_04",
@@ -384,7 +408,7 @@
         148,
         169
       ],
-      "sha256": "4605de072215d85822b996757be8da3adaefaf254904a50c08592bf73097cf6a",
+      "sha256": "9f065f241c63afc41ecf08e2c5e4c12aa80c1f5561f198e4f439baadf9012100",
       "source": "source/dog_04.mp4",
       "source_sha256": "0161bd0059545cb9c817473e5b8b0a8e7b5c207828db2c27e95a04f2cbbd2b27",
       "original_filename": "04_动态素材.mp4",
@@ -431,7 +455,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 5032749,
+      "npz_bytes": 2164191,
       "source_bytes": 91765,
       "quality": {
         "all_frames_inside_union": true,
@@ -459,7 +483,15 @@
         "soft_alpha_pixels": 334569,
         "uncompressed_bytes": 55989024
       },
-      "processing_seconds": 10.923
+      "processing_seconds": 10.923,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "c1da3e553bcd75778ae30e19048696ed6620bb6ef9359b2a1cf7a794958127e3",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_05",
@@ -499,7 +531,7 @@
         117,
         253
       ],
-      "sha256": "f8c84b31db77daed123c0a8978907fff9c2676e7478d6cf36d5383f0f32a21a6",
+      "sha256": "1c0473868a2fb677a35b779d86bc4f382cd9be48ca17c5aa4e4f0c183bfd9712",
       "source": "source/dog_05.mp4",
       "source_sha256": "59b437323178bca102a1e6746aecce222db2520b6f7ffc1ad67a964446f7d8e8",
       "original_filename": "05_动态素材.mp4",
@@ -546,7 +578,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 7140055,
+      "npz_bytes": 2253212,
       "source_bytes": 103191,
       "quality": {
         "all_frames_inside_union": true,
@@ -574,7 +606,15 @@
         "soft_alpha_pixels": 368274,
         "uncompressed_bytes": 58208928
       },
-      "processing_seconds": 11.479
+      "processing_seconds": 11.479,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "14c426f74d0bd60698e06baa5fe10765a3c3366b11df099ed6c2cfa0ed6c8502",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_06",
@@ -614,7 +654,7 @@
         216,
         237
       ],
-      "sha256": "f527c1dc1ae627c3e38c239312231f39bf9658b1ccb8dbb61f23bc0b3fc89a75",
+      "sha256": "063403097c288c9cb890ecc41c29e352b1fa0776f355c946db8742fa9d3486cd",
       "source": "source/dog_06.mp4",
       "source_sha256": "6f7fe8f08df3d95c4a9c37f714bf5d1ddae65a0145bd761c2a6789693a275fc1",
       "original_filename": "06_动态素材.mp4",
@@ -661,7 +701,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 3513996,
+      "npz_bytes": 1260708,
       "source_bytes": 98237,
       "quality": {
         "all_frames_inside_union": true,
@@ -689,7 +729,15 @@
         "soft_alpha_pixels": 257536,
         "uncompressed_bytes": 60774720
       },
-      "processing_seconds": 8.66
+      "processing_seconds": 8.66,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "3504a21e7013d07b9834f9cbdec8deda21dc574be52921264b58f086be6b49fe",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_07",
@@ -729,7 +777,7 @@
         178,
         8
       ],
-      "sha256": "25d44a06888db57e078dd03661933c28a2d7d6585b43f1c289d456c30b1cb4b7",
+      "sha256": "cda6a67131773be2e47c0833e36fd6e1af46744bd27c39e5eb2855887339a6d4",
       "source": "source/dog_07.mp4",
       "source_sha256": "771a66afd72ee07401b7aa7a051ae603446acdb544a517b63200e5b392e71d21",
       "original_filename": "07_动态素材.mp4",
@@ -776,7 +824,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 7306646,
+      "npz_bytes": 2557900,
       "source_bytes": 105515,
       "quality": {
         "all_frames_inside_union": true,
@@ -804,7 +852,15 @@
         "soft_alpha_pixels": 360528,
         "uncompressed_bytes": 58112352
       },
-      "processing_seconds": 9.464
+      "processing_seconds": 9.464,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "3cc4a8267dfabec3b837be62c08906a3e467c7a92a1d83036e2d63547f661bdc",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_08",
@@ -844,7 +900,7 @@
         0,
         243
       ],
-      "sha256": "fb816bc259fb82afcaed4a6bb3e34c88cce0383842b4b7d92e46ba88010d6a58",
+      "sha256": "5e85cc8bce8c1145d3508943028bbb4a0f54b0437100a2f524d8d686a21187a3",
       "source": "source/dog_08.mp4",
       "source_sha256": "645182b8e0869f2cf533f85337a93170efd0e13b69a2e61aedbcb3e6fd52a7c1",
       "original_filename": "08_动态素材.mp4",
@@ -891,7 +947,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 6334636,
+      "npz_bytes": 3076298,
       "source_bytes": 100848,
       "quality": {
         "all_frames_inside_union": true,
@@ -919,7 +975,15 @@
         "soft_alpha_pixels": 292743,
         "uncompressed_bytes": 51693768
       },
-      "processing_seconds": 8.478
+      "processing_seconds": 8.478,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "bbc2bb520dddf839d00f5923bfd21ab235bf09f3a06402d5f6efa0611f247442",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_09",
@@ -959,7 +1023,7 @@
         155,
         2
       ],
-      "sha256": "c54e0af5cdaba385ffdf28ead8a6eb1dfe4b743262ebd035d3791f8dab4bcec1",
+      "sha256": "92c2a08c453197e8ad0a0c2a1de51cf19e09812d97a820709cedb24cf5258750",
       "source": "source/dog_09.mp4",
       "source_sha256": "85ad6ea3d0f15ba9502ae3dcb8144ee93c1ec3abb0713f00beb51c7c4880112c",
       "original_filename": "09_动态素材.mp4",
@@ -1006,7 +1070,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 5056883,
+      "npz_bytes": 1864045,
       "source_bytes": 105772,
       "quality": {
         "all_frames_inside_union": true,
@@ -1034,7 +1098,15 @@
         "soft_alpha_pixels": 335711,
         "uncompressed_bytes": 49193280
       },
-      "processing_seconds": 10.711
+      "processing_seconds": 10.711,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "a98ee2c7f997446612791f98c901cd03c20d248d41e8038c342327dfc0e0d154",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_10",
@@ -1074,7 +1146,7 @@
         199,
         1
       ],
-      "sha256": "bc8df076d164cd2ebc22cff2d2791acbe8f5bda22f32e10a57e00c37654f9314",
+      "sha256": "37c6b1a17960fbcc3be33614419e10256d8afdaf9c1ebf2b988c55105f8d0cea",
       "source": "source/dog_10.mp4",
       "source_sha256": "c75d8822bc4af21e4e2f3074b637e665e62a01524d8d60f40a32b19ea9d39856",
       "original_filename": "10_动态素材.mp4",
@@ -1121,7 +1193,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 6480212,
+      "npz_bytes": 2189680,
       "source_bytes": 114569,
       "quality": {
         "all_frames_inside_union": true,
@@ -1149,7 +1221,15 @@
         "soft_alpha_pixels": 325378,
         "uncompressed_bytes": 69538108
       },
-      "processing_seconds": 11.36
+      "processing_seconds": 11.36,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "43ba55a2f107c8db8d7cc4c8c79c1969f57a63ebfc3af5bed6f7db6c609fe9c1",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_11",
@@ -1189,7 +1269,7 @@
         49,
         30
       ],
-      "sha256": "37ffc10000500358505c10ffde58bbcc2c728864579123013d6dfd8af4e16346",
+      "sha256": "42484ee3040d1baceebe879e97a36fa3c8e8ade8b4cf14af3546e785f80616d5",
       "source": "source/dog_11.mp4",
       "source_sha256": "bed453cae14a178cbc0f483f30044f27473aa407d147ca2a47f21b48370e0275",
       "original_filename": "11_动态素材.mp4",
@@ -1236,7 +1316,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 8495806,
+      "npz_bytes": 2754805,
       "source_bytes": 126387,
       "quality": {
         "all_frames_inside_union": true,
@@ -1264,7 +1344,15 @@
         "soft_alpha_pixels": 345635,
         "uncompressed_bytes": 77333424
       },
-      "processing_seconds": 11.599
+      "processing_seconds": 11.599,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "39ceffa5f3be450c972851a977eb17b8d570d7c2e1750dd02d3f34e7a94891f9",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_12",
@@ -1304,7 +1392,7 @@
         237,
         80
       ],
-      "sha256": "4aa7880e0d9d47fb5f233c87416097d1f1fb89f2bbdaa288766ee66b2251447a",
+      "sha256": "0f933f6f463c8391c199201ab1c31a716c171d36583c455366227ad5e4ef8f87",
       "source": "source/dog_12.mp4",
       "source_sha256": "0fae649b087b01977bfb4772f2c4f217e86b066230e2eef8130629559a394b5a",
       "original_filename": "12_动态素材.mp4",
@@ -1351,7 +1439,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 4390080,
+      "npz_bytes": 1656126,
       "source_bytes": 83557,
       "quality": {
         "all_frames_inside_union": true,
@@ -1379,7 +1467,15 @@
         "soft_alpha_pixels": 235063,
         "uncompressed_bytes": 51829848
       },
-      "processing_seconds": 8.492
+      "processing_seconds": 8.492,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "6fc3630ec02f1595f10bdc0b5f806e723a1ef2cbebfc086c3ec23c2035417822",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_13",
@@ -1419,7 +1515,7 @@
         227,
         52
       ],
-      "sha256": "79b54809eed2441044ba20f2d0da095b761f79bd9925daf3461424582ea49655",
+      "sha256": "42c09026fe819f20965f3653e69a99b0b0725a0cddc254d386f03b209eaf53da",
       "source": "source/dog_13.mp4",
       "source_sha256": "2c3fdf346a37bf27ce857a62fa0995aa2d6260ba8df72ae939a2d65331cd0cb5",
       "original_filename": "13_动态素材.mp4",
@@ -1466,7 +1562,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 4656226,
+      "npz_bytes": 1689337,
       "source_bytes": 90540,
       "quality": {
         "all_frames_inside_union": true,
@@ -1494,7 +1590,15 @@
         "soft_alpha_pixels": 247833,
         "uncompressed_bytes": 38687616
       },
-      "processing_seconds": 8.932
+      "processing_seconds": 8.932,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "d0f6c145c2122ea909c83321c480964231b5a2d75621317437b9cb8c16858396",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_14",
@@ -1534,7 +1638,7 @@
         221,
         105
       ],
-      "sha256": "a543810845367a40eaa79712688b40c6565aa6ab1108dfb2299ed27d12e0a989",
+      "sha256": "083e5207d06927abd9f237bc2ce8df331e799da45f5a47bbb48b2d764e80e4d0",
       "source": "source/dog_14.mp4",
       "source_sha256": "149a8e3ccf77e87ac38adee778703646a598a9262388f69ec780a9d4f09d4afd",
       "original_filename": "14_动态素材.mp4",
@@ -1581,7 +1685,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 7087792,
+      "npz_bytes": 2616200,
       "source_bytes": 121158,
       "quality": {
         "all_frames_inside_union": true,
@@ -1609,7 +1713,15 @@
         "soft_alpha_pixels": 386985,
         "uncompressed_bytes": 75841920
       },
-      "processing_seconds": 11.38
+      "processing_seconds": 11.38,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "cc9854946e828cbdb3f655a39df0da9e7d5c8a063655c5d05998239184c61093",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_15",
@@ -1651,7 +1763,7 @@
         229,
         2
       ],
-      "sha256": "cd8b4afe37736571faddfd3138c6d8fabcf6f3756ed29ba52eac3088f46c6761",
+      "sha256": "56ab8d6b608eb870e4f8a0d2cd884cf9375ed849ac6cd8f614343b27ad9a30ca",
       "source": "source/dog_15.mp4",
       "source_sha256": "44dc4ac51819c0178c8ffba0f99ef3584486322fd5b53cb1475d808b87adc3e6",
       "original_filename": "15_动态素材.mp4",
@@ -1698,7 +1810,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 6085243,
+      "npz_bytes": 2595885,
       "source_bytes": 124807,
       "quality": {
         "all_frames_inside_union": true,
@@ -1726,7 +1838,15 @@
         "soft_alpha_pixels": 318873,
         "uncompressed_bytes": 64377216
       },
-      "processing_seconds": 11.158
+      "processing_seconds": 11.158,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "2ec0c2365dd371ccf75f7faa4448e9056ce9e124ff9559f74ef947d8118a08b1",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     },
     {
       "id": "dog_16",
@@ -1766,7 +1886,7 @@
         221,
         12
       ],
-      "sha256": "dfa556d0e829f12829f36be504f52a8c87965f28b2b8f6a23e5042ad0d3b94df",
+      "sha256": "f4e33d9789514c6deb85553ec26a711e8dc2b0f5b3019acd5fb620bb04ed8cc3",
       "source": "source/dog_16.mp4",
       "source_sha256": "70e800a4c774900884e9207bed39ed8e7b5ca0a720b879bc530fd2017700a43b",
       "original_filename": "16_动态素材.mp4",
@@ -1813,7 +1933,7 @@
       },
       "anchor_method": "fixed median lower-limb stance-center x; maximum solid-largest-component floor y; pixel coordinates",
       "pipeline_signature": "f67a1dbb3ffd0da523350b492d32bcbb79837ce9faf65410c8ba2de4ebe96440",
-      "npz_bytes": 7148220,
+      "npz_bytes": 2356244,
       "source_bytes": 98269,
       "quality": {
         "all_frames_inside_union": true,
@@ -1841,7 +1961,15 @@
         "soft_alpha_pixels": 283562,
         "uncompressed_bytes": 65771280
       },
-      "processing_seconds": 9.552
+      "processing_seconds": 9.552,
+      "compression": {
+        "container": "npz",
+        "zip_method": "ZIP_LZMA",
+        "zip_method_id": 14,
+        "lossless": true
+      },
+      "decoded_frames_sha256": "0cd42c021bf19bebc6bfbce169d0ba27823309478472d28182a78d11e4421d12",
+      "decoded_frames_hash_convention": "SHA256 of all uint8 RGBA frames in N,H,W,4 C order, including transparent RGB; no NPY header"
     }
   ]
 }
