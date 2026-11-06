@@ -1,3 +1,0 @@
-# Explicit experimental backend only; tested in the existing Python environment.
--r requirements.txt
-mediapipe==1.2.2
