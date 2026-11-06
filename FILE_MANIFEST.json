@@ -1,229 +1,135 @@
 {
-  "skill_version": "1.3.6",
-  "engine_version": "overlay-1.3.5",
-  "cache_compression": "ZIP_LZMA",
-  "source_commit": "27d6be16859711e5d32b7c49f5626e1f3ada1d2d",
-  "skill_file_count": 55,
-  "files": {
-    ".gitignore": {
+  "version": "1.4.1",
+  "files": [
+    {
+      "path": ".gitignore",
       "bytes": 40,
       "sha256": "004b2bbbf16b8a90347c7e35695257654c4d4aefea636128b9aeaf4ab49da8b6"
     },
-    ".skillignore": {
+    {
+      "path": ".skillignore",
       "bytes": 158,
       "sha256": "7a1585f83b7d5182a2a0e40e34a35f7cdeb162c88d9f7b27abfc54903ed562b2"
     },
-    "SKILL.md": {
-      "bytes": 11390,
-      "sha256": "09aacd4fe3378ecbd58a3f1e609d90a7d6ad01eb24d0e783ecdb94b7261b5d35"
+    {
+      "path": "SKILL.md",
+      "bytes": 3892,
+      "sha256": "7f5d9800f0219074e9da367befde97a1f452ee87fa6b14a34443584115ba9e6c"
     },
-    "assets/deeplab_v3.provenance.json": {
-      "bytes": 1495,
-      "sha256": "c360ac00cdc7c697e131a5486b8676c492f1a475a7e61dc344b132b6df5aa67a"
+    {
+      "path": "assets/dog_manifest.json",
+      "bytes": 57446,
+      "sha256": "e8bdd473ee9ac1205bacfda2f222f65478c60a5a8eef714838be6756d9798cb3"
     },
-    "assets/deeplab_v3.tflite": {
-      "bytes": 2780176,
-      "sha256": "ff36e24d40547fe9e645e2f4e8745d1876d6e38b332d39a82f0bf0f5d1d561b3"
-    },
-    "assets/dog_manifest.json": {
-      "bytes": 61258,
-      "sha256": "1e1617d591fefbfeca11ef9c7527287ce08a393c65d704c4a45ba21386468bd2"
-    },
-    "assets/dogs/dog_01.npz": {
+    {
+      "path": "assets/dogs/dog_01.npz",
       "bytes": 3243079,
       "sha256": "10a386ef1da47b05d8a01f9d80a6021ea4b6f2c71189ce784532c4474a303ecc"
     },
-    "assets/dogs/dog_02.npz": {
+    {
+      "path": "assets/dogs/dog_02.npz",
       "bytes": 2388080,
       "sha256": "5fa8a9362959a6f312f54e66f1f7d7bed8e92999f8e71a025605d4ffcfa2928f"
     },
-    "assets/dogs/dog_03.npz": {
+    {
+      "path": "assets/dogs/dog_03.npz",
       "bytes": 1582560,
       "sha256": "b7cc89ed245d2d3061129758d54ee625e63370b9453cd59909c610d7bc2e6096"
     },
-    "assets/dogs/dog_04.npz": {
+    {
+      "path": "assets/dogs/dog_04.npz",
       "bytes": 2164191,
       "sha256": "9f065f241c63afc41ecf08e2c5e4c12aa80c1f5561f198e4f439baadf9012100"
     },
-    "assets/dogs/dog_05.npz": {
+    {
+      "path": "assets/dogs/dog_05.npz",
       "bytes": 2253212,
       "sha256": "1c0473868a2fb677a35b779d86bc4f382cd9be48ca17c5aa4e4f0c183bfd9712"
     },
-    "assets/dogs/dog_06.npz": {
-      "bytes": 1260708,
-      "sha256": "063403097c288c9cb890ecc41c29e352b1fa0776f355c946db8742fa9d3486cd"
-    },
-    "assets/dogs/dog_07.npz": {
+    {
+      "path": "assets/dogs/dog_07.npz",
       "bytes": 2557900,
       "sha256": "cda6a67131773be2e47c0833e36fd6e1af46744bd27c39e5eb2855887339a6d4"
     },
-    "assets/dogs/dog_08.npz": {
+    {
+      "path": "assets/dogs/dog_08.npz",
       "bytes": 3076298,
       "sha256": "5e85cc8bce8c1145d3508943028bbb4a0f54b0437100a2f524d8d686a21187a3"
     },
-    "assets/dogs/dog_09.npz": {
+    {
+      "path": "assets/dogs/dog_09.npz",
       "bytes": 1864045,
       "sha256": "92c2a08c453197e8ad0a0c2a1de51cf19e09812d97a820709cedb24cf5258750"
     },
-    "assets/dogs/dog_10.npz": {
+    {
+      "path": "assets/dogs/dog_10.npz",
       "bytes": 2189680,
       "sha256": "37c6b1a17960fbcc3be33614419e10256d8afdaf9c1ebf2b988c55105f8d0cea"
     },
-    "assets/dogs/dog_11.npz": {
+    {
+      "path": "assets/dogs/dog_11.npz",
       "bytes": 2754805,
       "sha256": "42484ee3040d1baceebe879e97a36fa3c8e8ade8b4cf14af3546e785f80616d5"
     },
-    "assets/dogs/dog_12.npz": {
+    {
+      "path": "assets/dogs/dog_12.npz",
       "bytes": 1656126,
       "sha256": "0f933f6f463c8391c199201ab1c31a716c171d36583c455366227ad5e4ef8f87"
     },
-    "assets/dogs/dog_13.npz": {
+    {
+      "path": "assets/dogs/dog_13.npz",
       "bytes": 1689337,
       "sha256": "42c09026fe819f20965f3653e69a99b0b0725a0cddc254d386f03b209eaf53da"
     },
-    "assets/dogs/dog_14.npz": {
+    {
+      "path": "assets/dogs/dog_14.npz",
       "bytes": 2616200,
       "sha256": "083e5207d06927abd9f237bc2ce8df331e799da45f5a47bbb48b2d764e80e4d0"
     },
-    "assets/dogs/dog_15.npz": {
+    {
+      "path": "assets/dogs/dog_15.npz",
       "bytes": 2595885,
       "sha256": "56ab8d6b608eb870e4f8a0d2cd884cf9375ed849ac6cd8f614343b27ad9a30ca"
     },
-    "assets/dogs/dog_16.npz": {
+    {
+      "path": "assets/dogs/dog_16.npz",
       "bytes": 2356244,
       "sha256": "f4e33d9789514c6deb85553ec26a711e8dc2b0f5b3019acd5fb620bb04ed8cc3"
     },
-    "assets/source/dog_01.mp4": {
-      "bytes": 113185,
-      "sha256": "c50f149ae5c63bf8ceffcfc5f4911de423b6656ae960c5b5b314120abb883f74"
+    {
+      "path": "references/asset-provenance.md",
+      "bytes": 1550,
+      "sha256": "d62ce989d1ff997563ce69e0f28879ceef812737f0d06847e51a73ac317a6a5f"
     },
-    "assets/source/dog_02.mp4": {
-      "bytes": 126938,
-      "sha256": "76caf61129fe79f4e125b4efba5f4a7a66365e9f0b14c363e39dbf515ce16c31"
+    {
+      "path": "references/usage-and-validation.md",
+      "bytes": 2520,
+      "sha256": "aabcfd808931d2d705a9b47c84a43af6b0f7d2d3bc2149dec4f13f2e4d756bdf"
     },
-    "assets/source/dog_03.mp4": {
-      "bytes": 86047,
-      "sha256": "98c9e9c0fa354d88a1b602b3aee47899cf4a5ed6d02a9a098711d8f29c06612a"
+    {
+      "path": "scripts/lightweight_vision.py",
+      "bytes": 6524,
+      "sha256": "9426948756b290a678add311a188bb413267baa7eb6298f2fbd6106d03bc023a"
     },
-    "assets/source/dog_04.mp4": {
-      "bytes": 91765,
-      "sha256": "0161bd0059545cb9c817473e5b8b0a8e7b5c207828db2c27e95a04f2cbbd2b27"
+    {
+      "path": "scripts/overlay_core.py",
+      "bytes": 30699,
+      "sha256": "3ab27fbde2ace5d344bb247d7f7c22417346cf112779996f024c911e9a49fc9e"
     },
-    "assets/source/dog_05.mp4": {
-      "bytes": 103191,
-      "sha256": "59b437323178bca102a1e6746aecce222db2520b6f7ffc1ad67a964446f7d8e8"
+    {
+      "path": "scripts/render_overlay.py",
+      "bytes": 22972,
+      "sha256": "66c10d4b57dd32c841e719097076f1e76882f6080097a5228b203765243ca478"
     },
-    "assets/source/dog_06.mp4": {
-      "bytes": 98237,
-      "sha256": "6f7fe8f08df3d95c4a9c37f714bf5d1ddae65a0145bd761c2a6789693a275fc1"
-    },
-    "assets/source/dog_07.mp4": {
-      "bytes": 105515,
-      "sha256": "771a66afd72ee07401b7aa7a051ae603446acdb544a517b63200e5b392e71d21"
-    },
-    "assets/source/dog_08.mp4": {
-      "bytes": 100848,
-      "sha256": "645182b8e0869f2cf533f85337a93170efd0e13b69a2e61aedbcb3e6fd52a7c1"
-    },
-    "assets/source/dog_09.mp4": {
-      "bytes": 105772,
-      "sha256": "85ad6ea3d0f15ba9502ae3dcb8144ee93c1ec3abb0713f00beb51c7c4880112c"
-    },
-    "assets/source/dog_10.mp4": {
-      "bytes": 114569,
-      "sha256": "c75d8822bc4af21e4e2f3074b637e665e62a01524d8d60f40a32b19ea9d39856"
-    },
-    "assets/source/dog_11.mp4": {
-      "bytes": 126387,
-      "sha256": "bed453cae14a178cbc0f483f30044f27473aa407d147ca2a47f21b48370e0275"
-    },
-    "assets/source/dog_12.mp4": {
-      "bytes": 83557,
-      "sha256": "0fae649b087b01977bfb4772f2c4f217e86b066230e2eef8130629559a394b5a"
-    },
-    "assets/source/dog_13.mp4": {
-      "bytes": 90540,
-      "sha256": "2c3fdf346a37bf27ce857a62fa0995aa2d6260ba8df72ae939a2d65331cd0cb5"
-    },
-    "assets/source/dog_14.mp4": {
-      "bytes": 121158,
-      "sha256": "149a8e3ccf77e87ac38adee778703646a598a9262388f69ec780a9d4f09d4afd"
-    },
-    "assets/source/dog_15.mp4": {
-      "bytes": 124807,
-      "sha256": "44dc4ac51819c0178c8ffba0f99ef3584486322fd5b53cb1475d808b87adc3e6"
-    },
-    "assets/source/dog_16.mp4": {
-      "bytes": 98269,
-      "sha256": "70e800a4c774900884e9207bed39ed8e7b5ca0a720b879bc530fd2017700a43b"
-    },
-    "references/asset-provenance.md": {
-      "bytes": 8595,
-      "sha256": "7b3101e281ce1f94988cf37c3ef99f0766630e082574eacd50cf7b5cdee06444"
-    },
-    "references/lossless-compression.md": {
-      "bytes": 3709,
-      "sha256": "94496eb63f916452cdd922baa1a2a02080a64a26303ebc53ac2b12c6ace29fef"
-    },
-    "references/semantic-feasibility.md": {
-      "bytes": 4660,
-      "sha256": "a11eca6a60f757ee8d0141224bece0a7cad2c870e8277ad24b13dc67e217bcac"
-    },
-    "references/usage-and-validation.md": {
-      "bytes": 45644,
-      "sha256": "1f113bb269356ce8f3fb20ca83643f0a6f23b8583806faebbedb12fe0bd4672c"
-    },
-    "scripts/classical_vision.py": {
-      "bytes": 13323,
-      "sha256": "3ab3392c295634d14c8b2e1323cbb187c456d57fe328b42102e61216f18cfc2b"
-    },
-    "scripts/diagnose_semantic.py": {
-      "bytes": 2511,
-      "sha256": "0c95fe1b56cb02ac132b0278de59603b67488db263b59b395c7450fb5289feaa"
-    },
-    "scripts/lossless_cache.py": {
-      "bytes": 14345,
-      "sha256": "59b3499a3935ea1c251637931e496716f3f982d49d509fc43db9aa873be09367"
-    },
-    "scripts/make_test_inputs.py": {
-      "bytes": 3416,
-      "sha256": "d699c673c236e5f7b8ca4b87eb12cdfc27e9f43a60ef8d38607d13659c843fcc"
-    },
-    "scripts/motion_tracking.py": {
-      "bytes": 8908,
-      "sha256": "0b75655603a8e501cee0c2863a4ee61ed18c01201c1502adfe499665ce0d6f66"
-    },
-    "scripts/overlay_core.py": {
-      "bytes": 49611,
-      "sha256": "385b2ce74e170ccf99da601167bf372a03415395908c30318f0d0b7866afdd42"
-    },
-    "scripts/prepare_assets.py": {
-      "bytes": 29694,
-      "sha256": "1eee77aa70db7a54724a197ef0da7b9dcd2f3ed8ed1b756d898aa48f8a6eb2a3"
-    },
-    "scripts/render_overlay.py": {
-      "bytes": 49470,
-      "sha256": "8ea0bfda682f3bae19c891cccfc3f61b1c9bb5a7983c909ecc56c959d2a0e67d"
-    },
-    "scripts/requirements-semantic.txt": {
-      "bytes": 118,
-      "sha256": "01b40f0e8085ffb1fcd050b6a924054a83bce2e305a4de3ad17045d0cad751c4"
-    },
-    "scripts/requirements.txt": {
+    {
+      "path": "scripts/requirements.txt",
       "bytes": 61,
       "sha256": "91654b42b866e013a99076758dc95fc2ea37f25bdbd1ac0fa7138ea44f826d49"
     },
-    "scripts/semantic_protection.py": {
-      "bytes": 2722,
-      "sha256": "63f34f598b041ebd3226d9d4c5bdae9b421d67467ac10d4e369e29baded0d2ba"
-    },
-    "scripts/shot_detection.py": {
+    {
+      "path": "scripts/shot_detection.py",
       "bytes": 7397,
       "sha256": "88c09c42fa55f0e90bae412eb8cc69f26b03215876ac3f4a473d628d7cd777c3"
-    },
-    "scripts/test_overlay.py": {
-      "bytes": 75345,
-      "sha256": "b8499301a5440115411926691d63953d9d1658cd2a7a01a196628c817bf3ac44"
     }
-  }
+  ]
 }
