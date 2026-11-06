@@ -1,135 +1,33 @@
 {
-  "version": "1.4.1",
+  "version": "1.4.2",
   "files": [
-    {
-      "path": ".gitignore",
-      "bytes": 40,
-      "sha256": "004b2bbbf16b8a90347c7e35695257654c4d4aefea636128b9aeaf4ab49da8b6"
-    },
-    {
-      "path": ".skillignore",
-      "bytes": 158,
-      "sha256": "7a1585f83b7d5182a2a0e40e34a35f7cdeb162c88d9f7b27abfc54903ed562b2"
-    },
-    {
-      "path": "SKILL.md",
-      "bytes": 3892,
-      "sha256": "7f5d9800f0219074e9da367befde97a1f452ee87fa6b14a34443584115ba9e6c"
-    },
-    {
-      "path": "assets/dog_manifest.json",
-      "bytes": 57446,
-      "sha256": "e8bdd473ee9ac1205bacfda2f222f65478c60a5a8eef714838be6756d9798cb3"
-    },
-    {
-      "path": "assets/dogs/dog_01.npz",
-      "bytes": 3243079,
-      "sha256": "10a386ef1da47b05d8a01f9d80a6021ea4b6f2c71189ce784532c4474a303ecc"
-    },
-    {
-      "path": "assets/dogs/dog_02.npz",
-      "bytes": 2388080,
-      "sha256": "5fa8a9362959a6f312f54e66f1f7d7bed8e92999f8e71a025605d4ffcfa2928f"
-    },
-    {
-      "path": "assets/dogs/dog_03.npz",
-      "bytes": 1582560,
-      "sha256": "b7cc89ed245d2d3061129758d54ee625e63370b9453cd59909c610d7bc2e6096"
-    },
-    {
-      "path": "assets/dogs/dog_04.npz",
-      "bytes": 2164191,
-      "sha256": "9f065f241c63afc41ecf08e2c5e4c12aa80c1f5561f198e4f439baadf9012100"
-    },
-    {
-      "path": "assets/dogs/dog_05.npz",
-      "bytes": 2253212,
-      "sha256": "1c0473868a2fb677a35b779d86bc4f382cd9be48ca17c5aa4e4f0c183bfd9712"
-    },
-    {
-      "path": "assets/dogs/dog_07.npz",
-      "bytes": 2557900,
-      "sha256": "cda6a67131773be2e47c0833e36fd6e1af46744bd27c39e5eb2855887339a6d4"
-    },
-    {
-      "path": "assets/dogs/dog_08.npz",
-      "bytes": 3076298,
-      "sha256": "5e85cc8bce8c1145d3508943028bbb4a0f54b0437100a2f524d8d686a21187a3"
-    },
-    {
-      "path": "assets/dogs/dog_09.npz",
-      "bytes": 1864045,
-      "sha256": "92c2a08c453197e8ad0a0c2a1de51cf19e09812d97a820709cedb24cf5258750"
-    },
-    {
-      "path": "assets/dogs/dog_10.npz",
-      "bytes": 2189680,
-      "sha256": "37c6b1a17960fbcc3be33614419e10256d8afdaf9c1ebf2b988c55105f8d0cea"
-    },
-    {
-      "path": "assets/dogs/dog_11.npz",
-      "bytes": 2754805,
-      "sha256": "42484ee3040d1baceebe879e97a36fa3c8e8ade8b4cf14af3546e785f80616d5"
-    },
-    {
-      "path": "assets/dogs/dog_12.npz",
-      "bytes": 1656126,
-      "sha256": "0f933f6f463c8391c199201ab1c31a716c171d36583c455366227ad5e4ef8f87"
-    },
-    {
-      "path": "assets/dogs/dog_13.npz",
-      "bytes": 1689337,
-      "sha256": "42c09026fe819f20965f3653e69a99b0b0725a0cddc254d386f03b209eaf53da"
-    },
-    {
-      "path": "assets/dogs/dog_14.npz",
-      "bytes": 2616200,
-      "sha256": "083e5207d06927abd9f237bc2ce8df331e799da45f5a47bbb48b2d764e80e4d0"
-    },
-    {
-      "path": "assets/dogs/dog_15.npz",
-      "bytes": 2595885,
-      "sha256": "56ab8d6b608eb870e4f8a0d2cd884cf9375ed849ac6cd8f614343b27ad9a30ca"
-    },
-    {
-      "path": "assets/dogs/dog_16.npz",
-      "bytes": 2356244,
-      "sha256": "f4e33d9789514c6deb85553ec26a711e8dc2b0f5b3019acd5fb620bb04ed8cc3"
-    },
-    {
-      "path": "references/asset-provenance.md",
-      "bytes": 1550,
-      "sha256": "d62ce989d1ff997563ce69e0f28879ceef812737f0d06847e51a73ac317a6a5f"
-    },
-    {
-      "path": "references/usage-and-validation.md",
-      "bytes": 2520,
-      "sha256": "aabcfd808931d2d705a9b47c84a43af6b0f7d2d3bc2149dec4f13f2e4d756bdf"
-    },
-    {
-      "path": "scripts/lightweight_vision.py",
-      "bytes": 6524,
-      "sha256": "9426948756b290a678add311a188bb413267baa7eb6298f2fbd6106d03bc023a"
-    },
-    {
-      "path": "scripts/overlay_core.py",
-      "bytes": 30699,
-      "sha256": "3ab27fbde2ace5d344bb247d7f7c22417346cf112779996f024c911e9a49fc9e"
-    },
-    {
-      "path": "scripts/render_overlay.py",
-      "bytes": 22972,
-      "sha256": "66c10d4b57dd32c841e719097076f1e76882f6080097a5228b203765243ca478"
-    },
-    {
-      "path": "scripts/requirements.txt",
-      "bytes": 61,
-      "sha256": "91654b42b866e013a99076758dc95fc2ea37f25bdbd1ac0fa7138ea44f826d49"
-    },
-    {
-      "path": "scripts/shot_detection.py",
-      "bytes": 7397,
-      "sha256": "88c09c42fa55f0e90bae412eb8cc69f26b03215876ac3f4a473d628d7cd777c3"
-    }
-  ]
+    {"path": ".gitignore", "bytes": 40, "sha256": "004b2bbbf16b8a90347c7e35695257654c4d4aefea636128b9aeaf4ab49da8b6"},
+    {"path": ".skillignore", "bytes": 158, "sha256": "7a1585f83b7d5182a2a0e40e34a35f7cdeb162c88d9f7b27abfc54903ed562b2"},
+    {"path": "SKILL.md", "bytes": 4546, "sha256": "75e04efc0ecfe91c4bf2743095e0e10c8e2d67214bf4daf1fee3d7c80a869afb"},
+    {"path": "assets/dog_manifest.json", "bytes": 57446, "sha256": "e8bdd473ee9ac1205bacfda2f222f65478c60a5a8eef714838be6756d9798cb3"},
+    {"path": "assets/dogs/dog_01.npz", "bytes": 3243079, "sha256": "10a386ef1da47b05d8a01f9d80a6021ea4b6f2c71189ce784532c4474a303ecc"},
+    {"path": "assets/dogs/dog_02.npz", "bytes": 2388080, "sha256": "5fa8a9362959a6f312f54e66f1f7d7bed8e92999f8e71a025605d4ffcfa2928f"},
+    {"path": "assets/dogs/dog_03.npz", "bytes": 1582560, "sha256": "b7cc89ed245d2d3061129758d54ee625e63370b9453cd59909c610d7bc2e6096"},
+    {"path": "assets/dogs/dog_04.npz", "bytes": 2164191, "sha256": "9f065f241c63afc41ecf08e2c5e4c12aa80c1f5561f198e4f439baadf9012100"},
+    {"path": "assets/dogs/dog_05.npz", "bytes": 2253212, "sha256": "1c0473868a2fb677a35b779d86bc4f382cd9be48ca17c5aa4e4f0c183bfd9712"},
+    {"path": "assets/dogs/dog_07.npz", "bytes": 2557900, "sha256": "cda6a67131773be2e47c0833e36fd6e1af46744bd27c39e5eb2855887339a6d4"},
+    {"path": "assets/dogs/dog_08.npz", "bytes": 3076298, "sha256": "5e85cc8bce8c1145d3508943028bbb4a0f54b0437100a2f524d8d686a21187a3"},
+    {"path": "assets/dogs/dog_09.npz", "bytes": 1864045, "sha256": "92c2a08c453197e8ad0a0c2a1de51cf19e09812d97a820709cedb24cf5258750"},
+    {"path": "assets/dogs/dog_10.npz", "bytes": 2189680, "sha256": "37c6b1a17960fbcc3be33614419e10256d8afdaf9c1ebf2b988c55105f8d0cea"},
+    {"path": "assets/dogs/dog_11.npz", "bytes": 2754805, "sha256": "42484ee3040d1baceebe879e97a36fa3c8e8ade8b4cf14af3546e785f80616d5"},
+    {"path": "assets/dogs/dog_12.npz", "bytes": 1656126, "sha256": "0f933f6f463c8391c199201ab1c31a716c171d36583c455366227ad5e4ef8f87"},
+    {"path": "assets/dogs/dog_13.npz", "bytes": 1689337, "sha256": "42c09026fe819f20965f3653e69a99b0b0725a0cddc254d386f03b209eaf53da"},
+    {"path": "assets/dogs/dog_14.npz", "bytes": 2616200, "sha256": "083e5207d06927abd9f237bc2ce8df331e799da45f5a47bbb48b2d764e80e4d0"},
+    {"path": "assets/dogs/dog_15.npz", "bytes": 2595885, "sha256": "56ab8d6b608eb870e4f8a0d2cd884cf9375ed849ac6cd8f614343b27ad9a30ca"},
+    {"path": "assets/dogs/dog_16.npz", "bytes": 2356244, "sha256": "f4e33d9789514c6deb85553ec26a711e8dc2b0f5b3019acd5fb620bb04ed8cc3"},
+    {"path": "references/asset-provenance.md", "bytes": 1839, "sha256": "8dbc62682fe382c59465f98e187c59525fe4632e28d056d6fea8ef6566b2ac81"},
+    {"path": "references/usage-and-validation.md", "bytes": 3050, "sha256": "49cccd87ba734d9694ba7a7393d9a74af55639c1e01ed359e15d5fc722a2964c"},
+    {"path": "scripts/edge_cleanup.py", "bytes": 1806, "sha256": "ceac1c9715c1231fe025e5021d1ca99fbfa8b6c27554c40f326b5bed9f40d62d"},
+    {"path": "scripts/lightweight_vision.py", "bytes": 15207, "sha256": "2c3752297558d00fc4294012825788a5ba1f787aafc49bae71000d6c2b459c33"},
+    {"path": "scripts/overlay_core.py", "bytes": 31820, "sha256": "a72efd4a92903fb2345de2011e5ac33d2d918461c7aa361beee7e88cc8bcd5d8"},
+    {"path": "scripts/render_overlay.py", "bytes": 23030, "sha256": "8eafbde63281b5a036667cfcd7d3527d36e6bbeb1e47a105cb9092de8e06e34f"},
+    {"path": "scripts/requirements.txt", "bytes": 61, "sha256": "91654b42b866e013a99076758dc95fc2ea37f25bdbd1ac0fa7138ea44f826d49"},
+    {"path": "scripts/shot_detection.py", "bytes": 7397, "sha256": "88c09c42fa55f0e90bae412eb8cc69f26b03215876ac3f4a473d628d7cd777c3"}
+  ],
+  "known_limitations": "建筑线仍可能误判；2张人像图因判定过严被误拒；并非全部场景验证通过。"
 }
