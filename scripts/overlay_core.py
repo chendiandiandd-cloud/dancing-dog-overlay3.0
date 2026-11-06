@@ -1,4 +1,4 @@
-"""Deterministic, bounded-memory overlay primitives; no network/model downloads."""
+"""Deterministic offline overlay primitives; bounded analysis and one shader."""
 from __future__ import annotations
 import base64
 import hashlib
@@ -7,18 +7,24 @@ import math
 import subprocess
 import tempfile
 import threading
-import time
 from pathlib import Path
 
 import cv2
 import numpy as np
 from PIL import Image, ImageOps
-
-from classical_vision import garment_mask, body_cue_mask, text_regions, reserved_regions, mask_box_fraction
-
 from shot_detection import ShotDetector
+from lightweight_vision import face_boxes, text_regions, head_regions
 
-ENGINE_VERSION = 'overlay-1.3.5'
+ENGINE_VERSION = 'overlay-1.4.1'
+HEIGHT_RATIO_MIN = .24
+HEIGHT_RATIO_MAX = .35
+
+
+def validate_height_ratio(ratio):
+    if ratio is not None and (not math.isfinite(ratio) or not HEIGHT_RATIO_MIN <= ratio <= HEIGHT_RATIO_MAX):
+        raise ValueError('--height-ratio必须为[.24,.35]内的有限数（24%–35%）')
+    return ratio
+RNG_SALT = 'overlay-1.3.5'  # Stable input salt; dog stream is isolated from placement.
 cv2.setNumThreads(1)
 
 
@@ -33,7 +39,6 @@ def sha256(path):
 def save_json(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    # Unique sibling temp prevents races between independent invocations.
     with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
                                      prefix=path.name + '.', suffix='.tmp', delete=False) as f:
         temp = Path(f.name)
@@ -54,7 +59,7 @@ def run(args, timeout=120):
 
 
 class PipeProcess:
-    """Deadline kills child even when pipe read/write blocks; stderr cannot fill a pipe."""
+    """Deadline kills child even when pipe read/write blocks."""
     def __init__(self, args, timeout=600, reader=False, writer=False):
         self.err = tempfile.TemporaryFile()
         self.expired = False
@@ -112,7 +117,6 @@ def rate(value, fallback=30.):
 
 def image_rgb(path):
     with Image.open(path) as im:
-        # First frame for animated image formats, explicitly documented in plan.
         im = ImageOps.exif_transpose(im).convert('RGBA')
         bg = Image.new('RGBA', im.size, (255, 255, 255, 255))
         bg.alpha_composite(im)
@@ -140,7 +144,7 @@ def media_info(path, image_duration, quality):
         for side in stream.get('side_data_list', []):
             if 'rotation' in side:
                 rotation = float(side['rotation'])
-        if abs(rotation) % 180 > 45 and abs(rotation) % 180 < 135:
+        if 45 < abs(rotation) % 180 < 135:
             w, h = h, w
         d = stream.get('duration') or data.get('format', {}).get('duration')
         duration = float(d) if d not in (None, 'N/A') else 0
@@ -151,16 +155,14 @@ def media_info(path, image_duration, quality):
         audio = next((s for s in data['streams'] if s.get('codec_type') == 'audio'), None)
         info = dict(kind='video', width=w, height=h, duration=duration, fps=fps,
                     source_fps=source_fps, audio=audio, rotation=rotation,
-                    source_start_time=data.get('format', {}).get('start_time'),
                     video_stream_index=stream['index'],
                     timing_policy='FFmpeg fps filter to CFR; VFR timestamps approximated, not preserved',
                     rotation_policy='FFmpeg default autorotate before identical analysis/render scaling')
     limit = {'preview': 1280, 'hd': 1920, 'source': max(w, h)}[quality]
     factor = min(1., limit / max(w, h))
     dw, dh = max(1, round(w * factor)), max(1, round(h * factor))
-    info.update(display_width=dw, display_height=dh,
-                output_width=dw + dw % 2, output_height=dh + dh % 2,
-                quality=quality, even_padding=[dw % 2, dh % 2])
+    info.update(display_width=dw, display_height=dh, output_width=dw + dw % 2,
+                output_height=dh + dh % 2, quality=quality, even_padding=[dw % 2, dh % 2])
     return info
 
 
@@ -213,17 +215,13 @@ def decode_image(text):
 
 
 def difference(a, b):
-    ga = cv2.cvtColor(a, cv2.COLOR_RGB2GRAY)
-    gb = cv2.cvtColor(b, cv2.COLOR_RGB2GRAY)
-    # Include RGB difference so equal-luminance color cuts are not invisible.
-    diff = max(float(np.mean(cv2.absdiff(ga, gb))),
-               float(np.mean(cv2.absdiff(a, b)))) / 255
+    ga, gb = cv2.cvtColor(a, cv2.COLOR_RGB2GRAY), cv2.cvtColor(b, cv2.COLOR_RGB2GRAY)
+    diff = max(float(np.mean(cv2.absdiff(ga, gb))), float(np.mean(cv2.absdiff(a, b)))) / 255
     ha = cv2.calcHist([a], [0, 1, 2], None, [8, 8, 8], [0, 256] * 3)
     hb = cv2.calcHist([b], [0, 1, 2], None, [8, 8, 8], [0, 256] * 3)
     cv2.normalize(ha, ha, 1, 0, cv2.NORM_L1)
     cv2.normalize(hb, hb, 1, 0, cv2.NORM_L1)
-    hist = float(cv2.compareHist(ha, hb, cv2.HISTCMP_BHATTACHARYYA))
-    return diff, hist
+    return diff, float(cv2.compareHist(ha, hb, cv2.HISTCMP_BHATTACHARYYA))
 
 
 def normalize_cuts(cuts, duration):
@@ -238,7 +236,14 @@ def normalize_cuts(cuts, duration):
 
 
 def analyze(path, info, input_hash, cache_dir, manual_cuts=None, timeout=600):
-    signature = dict(version=ENGINE_VERSION, opencv=cv2.__version__, detector='spatial-edge-context-3', hash=input_hash, kind=info['kind'],
+    """One source decode; retain at most three frames/shot from that same pass.
+
+    Representative is the exact detected cut frame. An isolated deterministic
+    reservoir retains one later sample, and the last observed frame is retained.
+    No frame is PNG-encoded until its shot is finalized; no per-frame body scan.
+    """
+    signature = dict(version=ENGINE_VERSION, opencv=cv2.__version__, detector='spatial-edge-context-3',
+                     sampling='representative-reservoir-last-1', hash=input_hash, kind=info['kind'],
                      width=info['display_width'], height=info['display_height'],
                      duration=info['duration'], source_fps=info['fps'], cuts=manual_cuts)
     key = hashlib.sha256(json.dumps(signature, sort_keys=True).encode()).hexdigest()
@@ -249,75 +254,85 @@ def analyze(path, info, input_hash, cache_dir, manual_cuts=None, timeout=600):
             if cached['signature'] == signature and cached['shots']:
                 for shot in cached['shots']:
                     decode_image(shot['representative_png'])
+                    for sample in shot['temporal_samples']:
+                        decode_image(sample['png'])
                 return cached, True
         except (ValueError, KeyError, cv2.error, TypeError, OSError):
             pass
     sw, sh = small_size(info)
-    if info['kind'] == 'video':
-        sampling_fps = info['fps'] if manual_cuts is None else min(12., info['fps'])
-    else:
-        sampling_fps = 1.
-    shots, previous, count = [], None, 0
+    sampling_fps = info['fps'] if info['kind'] == 'video' else 1.
     detector = ShotDetector(sampling_fps, info['duration'])
-    cut_events = []
-    temporal_samples = []
-    protection_interval = max(.5, info['duration'] / 240)
-    next_sample = 0.
-    cuts = normalize_cuts(manual_cuts, info['duration']) if manual_cuts is not None else None
-    manual_index = 0
-    frames = (video_frames(path, info, sw, sh, sampling_fps, timeout)
-              if info['kind'] == 'video' else iter([cv2.resize(image_rgb(path), (sw, sh))]))
+    cuts = (normalize_cuts(manual_cuts, info['duration'])
+            if manual_cuts is not None and info['kind'] == 'video' else None)
+    shots, cut_events, state = [], [], None
+    previous, count, manual_index = None, 0, 0
+    import random
+    sample_rng = random.Random(0)
+
+    def start(t, frame):
+        return dict(start=t, representative=frame.copy(), sample=None, last=None, seen=0)
+
+    def finish(s, end):
+        samples = {}
+        for item in (s['sample'], s['last']):
+            if item is not None and s['start'] < item[0] < end:
+                samples[item[0]] = item[1]
+        shots.append(dict(start=s['start'], end=end, representative_png=encode_image(s['representative']),
+                          temporal_samples=[dict(time=t, png=encode_image(f)) for t, f in sorted(samples.items())]))
+
+    frames = (video_frames(path, info, sw, sh, sampling_fps, timeout) if info['kind'] == 'video'
+              else iter([cv2.resize(image_rgb(path), (sw, sh))]))
     try:
         for i, frame in enumerate(frames):
             count += 1
             t = i / sampling_fps
-            if t + 1e-6 >= next_sample:
-                temporal_samples.append(dict(time=t, png=encode_image(frame)))
-                next_sample = t + protection_interval
-            if not shots:
-                shots.append(dict(start=0., representative_png=encode_image(frame)))
+            if state is None:
+                state = start(0., frame)
             if cuts is not None:
+                events = []
                 while manual_index < len(cuts) and t >= cuts[manual_index]:
-                    shots.append(dict(start=cuts[manual_index], representative_png=encode_image(frame)))
+                    events.append(dict(time=cuts[manual_index], frame=frame))
                     manual_index += 1
             else:
-                rgb_metrics = difference(previous, frame) if previous is not None else (0., 0.)
-                for event in detector.observe(frame, t, rgb_metrics):
-                    shots.append(dict(start=event['time'], representative_png=encode_image(event['frame'])))
+                events = detector.observe(frame, t, difference(previous, frame) if previous is not None else (0., 0.))
+            for event in events:
+                finish(state, event['time'])
+                state = start(event['time'], event['frame'])
+                if 'metrics' in event:
                     cut_events.append(event['metrics'])
+            state['seen'] += 1
+            if t > state['start']:
+                state['last'] = (t, frame.copy())
+                if sample_rng.randrange(state['seen']) == 0:
+                    state['sample'] = (t, frame.copy())
             previous = frame
     finally:
         if hasattr(frames, 'close'):
             frames.close()
-    if not shots:
+    if state is None:
         raise ValueError('分析未解码到任何帧')
-    if cuts is not None:
-        # Near EOF sampling can miss a short last interval; use last available frame.
-        while manual_index < len(cuts):
-            shots.append(dict(start=cuts[manual_index], representative_png=encode_image(previous)))
-            manual_index += 1
-    elif previous is not None:
-        # Last decoded CFR frame covers its frame interval; do not extrapolate
-        # persistence through a missing/truncated tail of the container duration.
+    if cuts is None:
         for event in detector.observe(previous, min(info['duration'], count / sampling_fps), (0., 0.)):
-            shots.append(dict(start=event['time'], representative_png=encode_image(event['frame'])))
+            finish(state, event['time'])
+            state = start(event['time'], event['frame'])
             cut_events.append(event['metrics'])
-    if previous is not None and (not temporal_samples or temporal_samples[-1]['time'] < (count-1)/sampling_fps):
-        temporal_samples.append(dict(time=(count-1)/sampling_fps, png=encode_image(previous)))
-    for i, shot in enumerate(shots):
-        shot['end'] = shots[i + 1]['start'] if i + 1 < len(shots) else info['duration']
-        shot['temporal_samples'] = [s for s in temporal_samples if shot['start'] <= s['time'] < shot['end']]
-    result = dict(signature=signature, shots=shots, sampling_fps=sampling_fps,
-                  protection_sampling_interval=protection_interval,
-                  sampled_frames=count, cut_events=cut_events,
-                  cut_method='manual override' if cuts is not None else 'CFR all-frame RGB + HSV + spatial luminance + adaptive edge + persistence/return',
-                  detector_stats=dict(rejected_returns=detector.rejected_returns,
-                                      illumination_frames=detector.illumination_frames),
+    else:
+        while manual_index < len(cuts):
+            finish(state, cuts[manual_index])
+            state = start(cuts[manual_index], previous)
+            manual_index += 1
+    finish(state, info['duration'])
+    result = dict(signature=signature, shots=shots, sampling_fps=sampling_fps, sampled_frames=count,
+                  analysis_source_decode_passes=1 if info['kind']=='video' else 0,
+                  protection_sample_counts=[1+len(s['temporal_samples']) for s in shots],
+                  protection_sampling_policy='same-pass representative + reservoir + last; max 3 per shot',
+                  cut_events=cut_events, cut_method='manual override' if cuts is not None else
+                  'CFR all-frame RGB + HSV + spatial luminance + adaptive edge + persistence/return',
+                  detector_stats=dict(rejected_returns=detector.rejected_returns, illumination_frames=detector.illumination_frames),
                   cut_time_resolution_seconds=1 / sampling_fps,
-                  limitations=[f'低分辨率最长边480分析；本次{sampling_fps:g}fps CFR采样，自动硬切时间约±{1/sampling_fps:.6f}s；VFR/超过60fps源不保留原始逐帧PTS。',
-                               '0.25s持续性/返回抑制短闪光；极亮/极暗帧及其0.25s恢复段不独立切镜，附近真实硬切可能被合并。长闪光、快速运动、渐变转场仍可能漏检或误检。',
-                               '小于0.25s的自动镜头合并；无硬切时整片一个镜头。',
-                               '全片时间采样并集保护；采样间隙仍可能漏掉短时进入的主体/文字。'])
+                  limitations=[f'最长边480、{sampling_fps:g}fps CFR多特征分镜；VFR逐帧PTS不保留。',
+                               '0.25s持续/返回确认；极亮/暗恢复段、快运动、渐变仍可能误/漏切。',
+                               '每镜头最多3帧人脸/文字启发式；没有全片主体保护，不能保证零遮挡。'])
     save_json(cache_file, result)
     return result, False
 
@@ -357,8 +372,6 @@ class DogLibrary:
             raise ValueError(f'{dog_id}: fps/anchor无效')
         if not 0 <= ax <= w or not 0 <= ay <= h:
             raise ValueError(f'{dog_id}: 脚底anchor不在裁切画布内')
-        # End is an EXCLUSIVE zero-based bound, matching frames[start:end].
-        # Keep original integrity checks above; do not alter the source NPZ.
         quality = e.get('quality', {})
         loop_start = int(e.get('loop_start_frame', quality.get('loop_start_frame', 0)))
         loop_end = int(e.get('loop_end_frame', quality.get('loop_end_frame', n)))
@@ -375,7 +388,6 @@ class DogLibrary:
         if loop_start != 0 or loop_end != n:
             warnings.append(f'{dog_id}: 仅循环原始帧[{loop_start},{loop_end})，原始{n}帧未删除；不宣称循环接缝已验证。')
         frames = frames[loop_start:loop_end]
-        # Union over every effective phase; alpha>0, not just representative frame.
         union = np.zeros((h, w), dtype=bool)
         for frame in frames:
             alpha_mask = frame[:, :, 3] > 0
@@ -383,8 +395,6 @@ class DogLibrary:
                 raise ValueError(f'{dog_id}: 包含全透明帧，会违反每帧恰好新增一只狗')
             union |= alpha_mask
         yy, xx = np.nonzero(union)
-        if not len(xx):
-            raise ValueError(f'{dog_id}: 所有帧透明')
         bbox = [int(xx.min()), int(yy.min()), int(xx.max()) + 1, int(yy.max()) + 1]
         data = dict(frames=frames, width=w, height=h, anchor=(ax, ay), fps=fps,
                     frame_count=len(frames), source_frame_count=n, loop_start_frame=loop_start,
@@ -407,68 +417,11 @@ class ShuffleBag:
         return self.previous
 
 
-def face_boxes(rgb):
-    cascade_dir = getattr(getattr(cv2, 'data', None), 'haarcascades', '')
-    if not cascade_dir:
-        return [], False
-    cascade = Path(cascade_dir) / 'haarcascade_frontalface_default.xml'
-    if not cascade.is_file():
-        return [], False
-    model = cv2.CascadeClassifier(str(cascade))
-    if model.empty():
-        return [], False
-    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    boxes = model.detectMultiScale(gray, 1.1, 5, minSize=(20, 20))
-    # Large false boxes (pets/texture) must never extrapolate to full-frame bodies.
-    # Large close-up faces require eye evidence from a second classical cascade.
-    eye = cv2.CascadeClassifier(str(Path(cascade_dir) / 'haarcascade_eye.xml'))
-    result = []
-    H, W = gray.shape
-    for x, y, w, h in boxes:
-        area = w*h / (W*H)
-        if area > .30 or w > W*.65 or h > H*.60:
-            continue
-        if area > .075:
-            eyes = eye.detectMultiScale(gray[y:y+int(h*.65), x:x+w], 1.1, 3,
-                                        minSize=(max(5,w//10),max(5,h//10))) if not eye.empty() else []
-            if len(eyes) < 1:
-                continue
-        result.append([int(x), int(y), int(x+w), int(y+h)])
-    return result, True
-
-
 def intersects(a, b):
     return a[0] < b[2] and a[2] > b[0] and a[1] < b[3] and a[3] > b[1]
 
 
-def person_boxes(rgb, faces):
-    """Bundled classical HOG plus conservative face-derived body regions; no downloads."""
-    h, w = rgb.shape[:2]
-    boxes = []
-    for x0, y0, x1, y1 in faces:
-        fw, fh = x1 - x0, y1 - y0
-        # Widen toward clothing/long hems; cap lateral close-up extrapolation.
-        spread = min(1.25 * fw, w * .18)
-        if fw/w > .28:
-            # Close-up head is not reliable evidence of full-width standing body.
-            # Preserve the actual detected face; constrain lateral inferred body.
-            spread = min(spread,w*.045)
-        boxes.append([max(0, x0 - spread), max(0, y0 - .2 * fh),
-                      min(w, x1 + spread), min(h, y1 + 8.5 * fh)])
-    hog_available = callable(getattr(cv2, 'HOGDescriptor_getDefaultPeopleDetector', None))
-    if hog_available and w >= 64 and h >= 128:
-        hog = cv2.HOGDescriptor()
-        hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
-        found, weights = hog.detectMultiScale(rgb, winStride=(8, 8), padding=(8, 8), scale=1.08)
-        for (x, y, bw, bh), weight in zip(found, np.asarray(weights).reshape(-1)):
-            if weight >= .5 and bw*bh/(w*h) < .60 and bw/w < .80:
-                boxes.append([max(0, x - .08 * bw), max(0, y - .04 * bh),
-                              min(w, x + 1.08 * bw), min(h, y + 1.04 * bh)])
-    return boxes, hog_available
-
-
 def validate_avoid_regions(regions):
-    """Normalize explicit rectangles; reject malformed/nonfinite/degenerate input."""
     result = []
     for region in regions or []:
         if len(region) != 4:
@@ -486,378 +439,137 @@ class PlacementError(ValueError):
         self.diagnostics = diagnostics
 
 
-def placement(rgb, info, dog, ratio, mode, rng, explicit_anchor=None, extra_frames=None, avoid_regions=None,
-              extra_mask=None, semantic_protection=False, protection_policy='strict'):
-    """Bounded search; protection relaxation requires an explicit caller policy."""
-    if protection_policy not in ('strict', 'body-relaxed', 'detected-relaxed'):
-        raise ValueError('未知保护策略')
-    relaxed = protection_policy != 'strict'
-    user_regions = validate_avoid_regions(avoid_regions)
-    frames = [rgb] + list(extra_frames or [])
-    faces, people, texts = [], [], []
-    masks = np.zeros(rgb.shape[:2], np.uint8)
-    if extra_mask is not None:
-        masks |= cv2.resize(extra_mask, (rgb.shape[1],rgb.shape[0]), interpolation=cv2.INTER_NEAREST)
-    haar, hog = True, True
-    for frame in frames:
-        if frame.shape != rgb.shape:
-            frame = cv2.resize(frame, (rgb.shape[1], rgb.shape[0]))
-        f, ha = face_boxes(frame)
-        if semantic_protection:
-            from semantic_protection import protector
-            segmenter = protector()
-            categories = segmenter.categories(frame)
-            semantic = segmenter.mask_from_categories(categories)
-            masks |= semantic
-            # Face rectangles must have actual person evidence, not cat Haar hits.
-            from classical_vision import mask_box_fraction
-            person_mask = (categories == segmenter.labels.index('person')).astype(np.uint8)
-            f = [box for box in f if mask_box_fraction(person_mask, box) > .5]
-            # Semantic silhouette replaces HOG/face-derived body rectangles and
-            # broad skin/GrabCut expansions. Never OR old bodymask back in.
-            p, ho = [], True
-        else:
-            p, ho = person_boxes(frame, f)
-            masks |= garment_mask(frame, f)
-            masks |= body_cue_mask(frame, f)
-        faces.extend(f); people.extend(p); texts.extend(text_regions(frame))
-        haar &= ha; hog &= ho
-    # De-duplicate repeated static boxes, keeping all temporal movement extents.
-    faces = [list(v) for v in dict.fromkeys(tuple(v) for v in faces)]
-    people = [list(v) for v in dict.fromkeys(tuple(v) for v in people)]
-    texts = [list(v) for v in dict.fromkeys(tuple(v) for v in texts)]
-    if relaxed:
-        # Explicit special-scene fallback only. Manual keep-out regions and
-        # complete-cycle bounds remain hard constraints in _fixed_placement.
-        people = []
-        masks[:] = 0
-        if protection_policy == 'detected-relaxed':
-            faces, texts = [], []
-    protection = (faces, haar, people, hog, texts, masks, frames)
-    prefer_inset = mode == 'auto' and explicit_anchor is None and ratio is None
-    sizes = ([ratio] if ratio is not None else [.40, .36, .32, .28, .24] if prefer_inset
-             else [.24, .22, .20, .18])
-    minimum_preferred = .24 if prefer_inset else .18
-    fallback_sizes = [] if prefer_inset else [.15, .12, .09, .06]
-    choices, failures = [], []
-    # Safety first, then larger, then inset: do not shrink merely to move inward.
-    for requested in sizes + ([] if ratio is not None else fallback_sizes):
-        if ratio is None and requested < minimum_preferred and choices:
-            break
-        try:
-            pos = _fixed_placement(rgb, info, dog, requested, mode, rng, explicit_anchor, protection, user_regions,
-                                   prefer_inset=prefer_inset)
-        except ValueError as exc:
-            failures.append(dict(requested_height_ratio=requested, message=str(exc),
-                                 rejection_counts=getattr(exc,'diagnostics',{})))
-            continue
-        # Pixel rounding + full-cycle fit determine actual size (never stale rh).
-        actual = pos['height'] / info['display_height']
-        if prefer_inset and actual < .24 - .5 / info['display_height']:
-            failures.append(dict(requested_height_ratio=requested, message='动作宽度约束会缩至24%以下，拒绝自动缩小'))
-            continue
-        pos['actual_height_ratio'] = actual
-        pos['size_preference_cost'] = (0. if ratio is not None else
-                                       1.5 * max(0., .40 - actual) if prefer_inset else
-                                       .9 * max(0., .24 - actual))
-        pos['joint_cost'] = pos['cost'] + pos['size_preference_cost'] + (
-            .20 * max(0., .06-pos['minimum_canvas_edge_margin']) / .06 if prefer_inset else 0.)
-        pos['evaluated_height_ratio'] = requested
-        choices.append(pos)
-    if not choices:
-        raise PlacementError('所有尺寸/落点均无法满足完整周期边界和分层检测保护',
-                             dict(evaluated_sizes=failures, face_count=len(faces), person_count=len(people),
-                                  text_count=len(texts), combined_mask_fraction=float((masks>0).mean()),
-                                  extra_body_mask_fraction=float((extra_mask>0).mean()) if extra_mask is not None else None))
-    # Deterministic tie-break: prefer larger; random seed selects spatial near-ties.
-    # Authorized relaxed scenes should not trade an available inset 24%-40%
-    # sticker for a larger one hugging the edge. Never lower the size floor.
-    inset_choices = ([p for p in choices if p['minimum_canvas_edge_margin'] >= .055]
-                     if relaxed and prefer_inset else [])
-    chosen = dict(min(inset_choices or choices,
-                      key=lambda p: (p['joint_cost'], -p['actual_height_ratio'])))
-    chosen.update(size_mode='manual' if ratio is not None else 'adaptive', requested_height_ratio=ratio,
-                  evaluated_sizes=[dict(height_ratio=p['actual_height_ratio'],
-                                        requested=p['evaluated_height_ratio'], joint_cost=p['joint_cost'],
-                                        anchor=p['anchor_normalized'], kind=p['kind']) for p in choices],
-                  selection_reason=('检测保护/完整周期边界优先；肤色连通与相邻中性衣服补充全片mask，尺寸在24%–40%内与内侧软权衡，不自动缩小至24%以下，不强制中心。' if prefer_inset else
-                                    '全片采样人物/衣服/文字并集与四角小保留区硬约束；连续支撑面证据不足时安全边角screen_sticker（非地面锚定、无阴影）'),
-                  garment_mask_png=encode_image(np.repeat((masks*255)[:,:,None],3,axis=2)),
-                  protection_sample_count=len(frames), garment_protected_fraction=float(np.mean(masks > 0)),
-                  source_asset_resolution=[dog['width'], dog['height']],
-                  output_asset_resolution=[chosen['width'], chosen['height']],
-                  scale_xy=[chosen['width'] / dog['width'], chosen['height'] / dog['height']],
-                  native_asset_provenance=dog.get('manifest', {}).get('resolution_provenance'),
-                  analysis_resolution=[rgb.shape[1], rgb.shape[0]])
-    chosen['auto_size_range'] = [.24, .40] if prefer_inset else None
-    chosen['size_fallback'] = False  # default auto never falls below the 24% floor
-    if ratio is None and not prefer_inset and chosen['actual_height_ratio'] < .175:
-        chosen['warnings'].append('常规0.18–0.24尺寸无安全落点；已缩小退化，不保证审美。')
-    chosen['protection_policy'] = protection_policy
-    if relaxed:
-        chosen['placement_mode'] = 'screen_sticker'
-        chosen['ground_anchored'] = False
-        chosen['contact_shadow'] = False
-        chosen['warnings'].append('用户允许的特殊场景兜底：' + ('关闭身体/衣服保护，保留检测脸与文字。' if protection_policy == 'body-relaxed' else '关闭自动主体/脸/文字保护；可能遮挡，保留人工禁区和完整动作边界。'))
-    return chosen
+def placement(rgb, info, dog, ratio, mode, rng, explicit_anchor=None, extra_frames=None,
+              avoid_regions=None, allow_partial_overlap=False):
+    """Single bounded size/location comparison. Manual exclusions always hard.
 
-
-def _fixed_placement(rgb, info, dog, ratio, mode, rng, explicit_anchor=None, protection=None, user_regions=None,
-                     prefer_inset=False):
+    Without explicit authorization detected face/text rectangles are hard.
+    Authorization makes these automatic cues soft penalties in the SAME search,
+    not a retry stage; body/clothing inference and motion are not implemented.
+    """
+    validate_height_ratio(ratio)
     W, H = info['display_width'], info['display_height']
     sw, sh = rgb.shape[1], rgb.shape[0]
-    scale = min(H * ratio / dog['height'], W * .8 / dog['width'], H * .8 / dog['height'])
-    rw, rh = max(1, round(dog['width'] * scale)), max(1, round(dog['height'] * scale))
-    ax = dog['anchor'][0] * rw / dog['width']
-    ay = dog['anchor'][1] * rh / dog['height']
-    faces, haar, people, hog, texts, garment, sampled = protection
-    corner_reserves = reserved_regions(sh, sw)
-    avoid = texts + ([] if explicit_anchor is not None else corner_reserves)
-    avoid = [[x * W / sw, y * H / sh, x2 * W / sw, y2 * H / sh] for x,y,x2,y2 in avoid]
-    user_avoid = [[x*W,y*H,x2*W,y2*H] for x,y,x2,y2 in (user_regions or [])]
-    faces = [[x * W / sw, y * H / sh, x2 * W / sw, y2 * H / sh] for x, y, x2, y2 in faces]
-    people = [[x * W / sw, y * H / sh, x2 * W / sw, y2 * H / sh] for x, y, x2, y2 in people]
-    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    grad = cv2.magnitude(cv2.Sobel(gray, cv2.CV_32F, 1, 0), cv2.Sobel(gray, cv2.CV_32F, 0, 1)) / 1024
-    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB).astype(np.float32)
-    contrast = np.linalg.norm(lab - np.mean(lab, axis=(0, 1)), axis=2) / 255
-    yy, xx = np.mgrid[:sh, :sw]
-    center = np.exp(-(((xx / sw - .5) / .3) ** 2 + ((yy / sh - .5) / .35) ** 2))
-    saliency = contrast * .6 + grad * .4 + center * .18
-    warnings = ['显著性proxy不是可靠语义识别/主体避让；Hough水平线不等于理解地面。']
-    if not haar:
-        warnings.append('本地Haar级联不可用，未做人脸检测；不下载模型。')
-    if not hog:
-        warnings.append('本地HOG人物检测不可用；仅保留可用的人脸扩展近似框，不保证人物避让。')
-
-    rejections = dict(bounds=0, face=0, person=0, text_or_corner=0, user_region=0, body_or_garment=0)
-
-    def evaluate(x, y, support, kind, geometry=None):
-        left, top = round(x - ax), round(y - ay)
-        rect = [left, top, left + rw, top + rh]
-        # Full RGBA canvas bound is stronger than union-alpha bound.
-        if left < 0 or top < 0 or rect[2] > W or rect[3] > H:
-            rejections['bounds'] += 1
-            return None
-        for layer,boxes in [('face',faces),('person',people),('text_or_corner',avoid),('user_region',user_avoid)]:
-            if any(intersects(rect, f) for f in boxes):
-                rejections[layer] += 1
-                return None
-        scaled_rect = [rect[0]*sw/W, rect[1]*sh/H, rect[2]*sw/W, rect[3]*sh/H]
-        if mask_box_fraction(garment, scaled_rect) > .015:
-            rejections['body_or_garment'] += 1
-            return None
-        x0, y0 = max(0, int(left * sw / W)), max(0, int(top * sh / H))
-        x1, y1 = min(sw, max(x0 + 1, math.ceil(rect[2] * sw / W))), min(sh, max(y0 + 1, math.ceil(rect[3] * sh / H)))
-        lower_region_cost = .55 * max(0., (.72 - y / H) / .72)
-        cost = (float(np.mean(saliency[y0:y1, x0:x1]))
-                + .35 * float(np.mean(grad[y0:y1, x0:x1])) - support * .15
-                + lower_region_cost)
-        if geometry:
-            cost += geometry['cost_adjustment']
-        return dict(x=left, y=top, width=rw, height=rh, anchor_pixel=[left + ax, top + ay],
-                    anchor_normalized=[(left + ax) / W, (top + ay) / H], cost=cost,
-                    kind=kind, support_score=support, support_geometry=geometry,
-                    lower_region_cost=lower_region_cost,
-                    canvas_edge_margins_normalized=[left/W, top/H, (W-left-rw)/W, (H-top-rh)/H],
-                    minimum_canvas_edge_margin=min(left/W, top/H, (W-left-rw)/W, (H-top-rh)/H))
-
-    candidates = []
-    if explicit_anchor is not None:
-        # Shrink, do not silently move the requested normalized foot point.
-        x, y = explicit_anchor[0] * W, explicit_anchor[1] * H
-        for _ in range(80):
-            p = evaluate(x, y, 0, 'explicit_anchor')
-            if p:
-                candidates = [p]
-                break
-            if rw <= 1 and rh <= 1:
-                break
-            rw, rh = max(1, int(rw * .9)), max(1, int(rh * .9))
-            ax, ay = dog['anchor'][0] * rw / dog['width'], dog['anchor'][1] * rh / dog['height']
-        if not candidates:
-            raise ValueError('指定anchor不能在不越界/不覆盖检测人脸的条件下放置狗')
-    else:
-        if mode == 'auto':
-            edges = cv2.Canny(gray, 60, 150)
-            temporal_edges = [cv2.Canny(cv2.cvtColor(f,cv2.COLOR_RGB2GRAY),60,150) for f in sampled]
-            hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
-            lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=25,
-                                    minLineLength=max(15, int(sw * .12)), maxLineGap=12)
-            # OpenCV bindings return either N,1,4 or N,4 depending on version.
-            line_rows = [] if lines is None else np.asarray(lines).reshape(-1, 4)[:150].tolist()
-            # Unrestricted probabilistic Hough can consume fragmented rail edges
-            # into many diagonals in water/foliage. A near-horizontal accumulator
-            # retains those real long supports; demand observed edge coverage.
-            aligned = cv2.HoughLines(edges, 1, np.pi / 360,
-                                     threshold=max(18, int(sw * .35)),
-                                     min_theta=np.pi / 2 - .10, max_theta=np.pi / 2 + .10)
-            if aligned is not None:
-                for rho, theta in np.asarray(aligned).reshape(-1, 2)[:40]:
-                    cols = np.arange(sw)
-                    ys = (float(rho) - cols * math.cos(float(theta))) / math.sin(float(theta))
-                    observed = np.zeros(sw, dtype=bool)
-                    for offset in (-1, 0, 1):
-                        rows = np.rint(ys).astype(int) + offset
-                        valid = (rows >= 0) & (rows < sh)
-                        observed[valid] |= edges[rows[valid], cols[valid]] > 0
-                    support_x = np.flatnonzero(observed)
-                    if len(support_x) < max(12, sw * .3):
-                        continue
-                    lx, rx = int(support_x[0]), int(support_x[-1])
-                    if len(support_x) / (rx - lx + 1) < .5:
-                        continue
-                    line_rows.append([lx, float(ys[lx]), rx, float(ys[rx])])
-            verticals = [v for v in line_rows if abs(float(v[2] - v[0])) <= abs(float(v[3] - v[1])) * .25
-                         and abs(float(v[3] - v[1])) >= sh * .06]
-            for line in line_rows:
-                x1, y1, x2, y2 = map(float, line)
-                if min(y1, y2) / sh < .52:
-                    continue  # Exclude upper-frame ceiling/distant structures, not semantic detection.
-                if abs(y2 - y1) > max(1, abs(x2 - x1)) * .22:
-                    continue
-                xa, xb = max(0, int(min(x1, x2))), min(sw, int(max(x1, x2)) + 1)
-                ly = max(0, min(sh - 1, round((y1 + y2) / 2)))
-                band, gap = max(2, round(sh * .035)), max(1, round(sh * .006))
-                above = (max(0, ly - band - gap), max(0, ly - gap))
-                below = (min(sh, ly + gap + 1), min(sh, ly + band + gap + 1))
-                def strip_mean(arr, bounds):
-                    region = arr[bounds[0]:bounds[1], xa:xb]
-                    return float(np.mean(region)) if region.size else 0.
-                texture_above = strip_mean(grad, above)
-                texture_below = strip_mean(grad, below)
-                smooth_both = max(0., 1 - max(texture_above, texture_below) / .10)
-                length_fraction = abs(x2 - x1) / sw
-                longness = min(1., max(0., (length_fraction - .5) / .35))
-                normalized_y = ly / sh
-                mid_upper = min(1., max(0., (.72 - normalized_y) / .12))
-                horizon_penalty = .26 * longness * smooth_both * mid_upper
-                lower_support_bonus = .075 * min(1., max(0., (normalized_y - .45) / .45))
-                # Darker material below a bright edge is a weak top-surface cue;
-                # the opposite polarity is often the underside of a beam/shelf.
-                polarity = (strip_mean(gray, above) - strip_mean(gray, below)) / 255
-                top_edge_bonus = .06 * max(-1., min(1., polarity))
-                # A coherent, low-texture material strip immediately BELOW an
-                # edge is a useful beam/shelf cue, unlike random water edge votes.
-                material_bonus = .22 * max(0., 1 - texture_below / .08) * min(1., max(0., polarity / .35))
-                # Thin image-bottom borders should not outrank interior supports;
-                # this is a generic framing penalty, not a target anchor coordinate.
-                border_penalty = .20 * min(1., max(0., (normalized_y - .90) / .10))
-                for k in (.25, .5, .75):
-                    px, py = x1 + k * (x2 - x1), y1 + k * (y2 - y1)
-                    # Demand edge observations across the actual foot span, not a
-                    # long Hough segment assembled from disconnected ripple votes.
-                    half = max(5, round(rw * sw / W * .30))
-                    cx0, cx1 = max(0,round(px)-half), min(sw,round(px)+half+1)
-                    cols = np.arange(cx0,cx1)
-                    if len(cols) < 2*half*.9:
-                        continue
-                    slope = (y2-y1) / max(1.,x2-x1)
-                    rows = np.rint(py+(cols-px)*slope).astype(int)
-                    coverage = []
-                    for edge in temporal_edges:
-                        votes = np.zeros(len(cols),bool)
-                        for offset in (-2,-1,0,1,2):
-                            rr = np.clip(rows+offset,0,sh-1)
-                            votes |= edge[rr,cols] > 0
-                        coverage.append(float(votes.mean()))
-                    continuity = min(coverage) if coverage else 0.
-                    # Real-world support is still heuristic: reject ambiguous blue
-                    # smooth expanses and thin/discontinuous distant lines.
-                    patch = hsv[min(sh-1,round(py)+3):min(sh,round(py)+band*2+3),cx0:cx1]
-                    blue_fraction = float(np.mean((patch[...,0]>85)&(patch[...,0]<125)&(patch[...,1]>35))) if patch.size else 0.
-                    if continuity < .72:
-                        continue
-                    foot_patch = gray[min(sh-1,round(py)+3):min(sh,round(py)+round(sh*.12)),cx0:cx1]
-                    gx = float(np.mean(np.abs(cv2.Sobel(foot_patch,cv2.CV_32F,1,0)))) if foot_patch.size else 0.
-                    gy = float(np.mean(np.abs(cv2.Sobel(foot_patch,cv2.CV_32F,0,1)))) if foot_patch.size else 0.
-                    ripple_ratio = gy / max(1.,gx)
-                    if blue_fraction > .45 and texture_below < .12:
-                        continue
-                    if material_bonus < .035 and (texture_below > .09 or (ripple_ratio > 1.6 and normalized_y < .80)):
-                        continue
-                    vertical_reward = 0.
-                    for vx1, vy1, vx2, vy2 in verticals:
-                        vx, vtop, vbottom = float(vx1 + vx2) / 2, float(min(vy1, vy2)), float(max(vy1, vy2))
-                        # Reward only a nearby perpendicular structure that reaches
-                        # the support line; not every vertical elsewhere in the shot.
-                        distance_y = max(vtop - py, py - vbottom, 0.)
-                        if distance_y <= sh * .08:
-                            proximity = max(0., 1 - abs(vx - px) / max(sw * .3, 1.))
-                            reach = max(0., 1 - distance_y / max(sh * .08, 1.))
-                            vertical_reward = max(vertical_reward, proximity * reach)
-                    geometry = dict(line_normalized=[x1 / sw, y1 / sh, x2 / sw, y2 / sh],
-                                    local_edge_continuity=continuity, temporal_support_samples=len(coverage),
-                                    blue_smooth_expanses_fraction=blue_fraction, horizontal_ripple_ratio=ripple_ratio,
-                                    texture_above=texture_above, texture_below=texture_below,
-                                    horizon_penalty=horizon_penalty, lower_support_bonus=lower_support_bonus,
-                                    nearby_vertical_score=vertical_reward, top_edge_bonus=top_edge_bonus,
-                                    material_below_bonus=material_bonus, image_border_penalty=border_penalty,
-                                    cost_adjustment=horizon_penalty + border_penalty - lower_support_bonus
-                                                    - .10 * vertical_reward - top_edge_bonus - material_bonus)
-                    p = evaluate(px * W / sw, py * H / sh,
-                                 min(1., length_fraction), 'hough_horizontal_support', geometry)
-                    if p:
-                        candidates.append(p)
-        if mode == 'auto':
-            if prefer_inset:
-                # Twelve bounded, meaningful interior canvas centers; no extra
-                # detector pass and no unbounded dense center search.
-                for cx in (.22, .40, .60, .78):
-                    for foot_y in (.60, .74, .88):
-                        left = cx * W - rw / 2
-                        top = min(foot_y * H - ay, H - rh - H * .08)
-                        p = evaluate(left + ax, top + ay, 0, 'screen_sticker_inset')
-                        if p:
-                            candidates.append(p)
-            # Always compete with supports: a line must beat usable lower-frame
-            # whitespace instead of forcing a remote ceiling/horizon placement.
-            for fx in (.035, .12, .88, .965):
-                for fy in (.70, .80, .89, .94):
-                    p = evaluate(ax + fx * (W - rw), min(H - rh + ay - H*.065, H * fy),
-                                 0, 'screen_sticker')
-                    if p:
-                        candidates.append(p)
-        if not candidates:
-            if mode == 'auto':
-                warnings.append('无可用可靠支撑候选：退回角落/边缘留白，不声称理解地面。')
-            # Corners first; if faces block every corner use conservative perimeter grid.
-            corners = [(0, 1), (1, 1), (0, 0), (1, 0)]
-            for fx, fy in corners:
-                p = evaluate(ax + fx * (W - rw), ay + (H*.065 if fy == 0 else H-rh-H*.065), 0, 'screen_sticker')
-                if p:
-                    candidates.append(p)
-            if not candidates:
-                for fx in np.linspace(0, 1, 9):
-                    for fy in ((.25,.4,.55,.65,.8,1.) if user_regions and mode == 'auto' else
-                               (0.,.15,.3,.45,.65,.8,1.) if mode == 'auto' else (0.,.5,1.)):
-                        p = evaluate(ax + fx * (W - rw), ay + H*.065 + fy * max(0,H-rh-H*.13), 0, 'screen_sticker')
-                        if p:
-                            candidates.append(p)
-            if not candidates:
-                raise PlacementError('找不到不越界且避开人脸/人物/文字/身体衣服/人工禁区的放置位置',rejections)
-    best = min(p['cost'] for p in candidates)
-    inset_candidates = ([p for p in candidates if p['minimum_canvas_edge_margin'] >= .06 - 1e-6
-                         and p['cost'] <= best + .15] if prefer_inset else [])
-    pool = inset_candidates or candidates
-    best_pool = min(p['cost'] for p in pool)
-    shortlist = [p for p in pool if p['cost'] <= best_pool + .035]
+    user_regions = validate_avoid_regions(avoid_regions)
+    manual = [[x*W,y*H,x2*W,y2*H] for x,y,x2,y2 in user_regions]
+    faces, texts, heads, haar = [], [], [], True
+    frames = [rgb] + list(extra_frames or [])[:2]
+    for frame in frames:
+        if frame.shape != rgb.shape:
+            frame = cv2.resize(frame, (sw, sh))
+        found, available = face_boxes(frame)
+        faces.extend(found)
+        texts.extend(text_regions(frame))
+        for head in head_regions(frame):
+            x,y,x2,y2 = head['box']
+            heads.append(dict(head,box=[x*W/sw,y*H/sh,x2*W/sw,y2*H/sh]))
+        haar &= available
+    def scaled(boxes):
+        return [[x*W/sw,y*H/sh,x2*W/sw,y2*H/sh]
+                for x,y,x2,y2 in dict.fromkeys(tuple(b) for b in boxes)]
+    faces, texts = scaled(faces), scaled(texts)
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32)/255
+    grad = cv2.magnitude(cv2.Sobel(gray,cv2.CV_32F,1,0), cv2.Sobel(gray,cv2.CV_32F,0,1))
+    cost_map = grad*.25 + np.abs(gray-float(gray.mean()))*.45
+    integral = cv2.integral(cost_map)
+    sizes = [ratio] if ratio is not None else [.35, .30, .24]
+    choices = []
+    rejections = dict(bounds=0, user_region=0, face=0, text=0, below_size_floor=0)
+    evaluated = []
+    for requested in sizes:
+        scale = min(H*requested/dog['height'], W*.88/dog['width'], H*.88/dog['height'])
+        rw, rh = max(1,round(dog['width']*scale)),max(1,round(dog['height']*scale))
+        ax, ay = dog['anchor'][0]*rw/dog['width'],dog['anchor'][1]*rh/dog['height']
+        if explicit_anchor is not None:
+            px, py = explicit_anchor[0]*W,explicit_anchor[1]*H
+            # Exact geometric fit at a fixed foot point; no iterative shrink/retry.
+            limits = [1.]
+            for room, need in ((px,ax),(W-px,rw-ax),(py,ay),(H-py,rh-ay)):
+                if need > 0:
+                    limits.append(max(0.,room)/need)
+            fit = min(limits)
+            rw, rh = max(1,math.floor(rw*fit)),max(1,math.floor(rh*fit))
+            ax, ay = dog['anchor'][0]*rw/dog['width'],dog['anchor'][1]*rh/dog['height']
+            positions = [(round(px-ax),round(py-ay),'explicit_anchor')]
+        else:
+            # Finite inner grid plus edge inset fallback, no dense special retries.
+            positions = [(round(cx*W-rw/2),round(cy*H-rh/2),'screen_sticker_inset')
+                         for cx in (.22,.40,.60,.78) for cy in (.38,.56,.74)]
+            positions += [(round(fx*max(0,W-rw)),round(fy*max(0,H-rh)),'screen_sticker')
+                          for fx in (.06,.50,.94) for fy in (.08,.50,.92)]
+            if mode == 'corner':
+                positions = [(round(fx*(W-rw)),round(fy*(H-rh)),'screen_sticker')
+                             for fx,fy in ((.06,.92),(.94,.92),(.06,.08),(.94,.08))]
+        # All paths share the same floor, including manual ratios and anchor fit.
+        # Integer round/floor may differ by at most one pixel, never more.
+        if rh < H*HEIGHT_RATIO_MIN-1 or rh > H*HEIGHT_RATIO_MAX+1:
+            rejections['below_size_floor'] += 1
+            continue
+        evaluated.append(requested)
+        for x,y,kind in dict.fromkeys(positions):
+            rect = [x,y,x+rw,y+rh]
+            if x < 0 or y < 0 or rect[2] > W or rect[3] > H:
+                rejections['bounds'] += 1
+                continue
+            if any(intersects(rect,b) for b in manual):
+                rejections['user_region'] += 1
+                continue
+            face_hit, text_hit = any(intersects(rect,b) for b in faces),any(intersects(rect,b) for b in texts)
+            if not allow_partial_overlap and (face_hit or text_hit):
+                rejections['face' if face_hit else 'text'] += 1
+                continue
+            a,b,c,d = max(0,int(x*sw/W)),max(0,int(y*sh/H)),min(sw,math.ceil((x+rw)*sw/W)),min(sh,math.ceil((y+rh)*sh/H))
+            density = float((integral[d,c]-integral[b,c]-integral[d,a]+integral[b,a])/max(1,(c-a)*(d-b)))
+            margins = [x/W,y/H,(W-x-rw)/W,(H-y-rh)/H]
+            edge = min(margins)
+            # Penalize actual fraction of a small head cue covered, not global
+            # skin area. Even authorized partial overlap should strongly prefer
+            # an available candidate that does not cover a likely missed face.
+            head_overlap = 0.
+            for head in heads:
+                hx,hy,hx2,hy2 = head['box']
+                overlap = max(0,min(x+rw,hx2)-max(x,hx))*max(0,min(y+rh,hy2)-max(y,hy))
+                head_overlap = max(head_overlap,head['confidence']*overlap/max(1,(hx2-hx)*(hy2-hy)))
+            # Likely missed heads outrank incidental text/false-face costs;
+            # partial-scene permission is not a preference for covering a face.
+            head_penalty = 8.0 * head_overlap
+            soft = float(face_hit)*2. + float(text_hit)*1.5 + head_penalty
+            cost = density + soft + 1.0*max(0.,.35-rh/H) + .25*max(0.,.06-edge)/.06 + .08*max(0.,.70-(y+ay)/H)
+            choices.append(dict(x=x,y=y,width=rw,height=rh,anchor_pixel=[x+ax,y+ay],
+                                anchor_normalized=[(x+ax)/W,(y+ay)/H], actual_height_ratio=rh/H,
+                                evaluated_height_ratio=requested, cost=cost,joint_cost=cost,kind=kind,
+                                automatic_overlap_penalty=soft, head_cue_overlap_penalty=head_penalty,
+                                head_cue_overlap_fraction=head_overlap, detected_overlap=bool(face_hit or text_hit),
+                                canvas_edge_margins_normalized=margins,minimum_canvas_edge_margin=edge))
+    if not choices:
+        raise PlacementError('无合法位：须满足24%–35%尺寸（最多1像素取整容差）、完整动作边界、人工禁区及当前脸/文字保护策略',rejections)
+    best = min(p['cost'] for p in choices)
+    shortlist = [p for p in choices if p['cost'] <= best+.015]
     chosen = dict(rng.choice(shortlist))
-    chosen['inset_preference_applied'] = prefer_inset
-    chosen['inset_candidate_count'] = len(inset_candidates)
-    chosen['edge_fallback'] = prefer_inset and chosen['minimum_canvas_edge_margin'] < .06 - 1e-6
-    if chosen['edge_fallback']:
-        warnings.append('当前最大安全尺寸无合适内侧留白候选；已边缘fallback，不强制中心或覆盖检测保护。')
-    chosen.update(candidate_count=len(candidates), best_candidate_count=len(shortlist),
-                  ranked_candidates=sorted(candidates, key=lambda p: p['cost'])[:12],
-                  detected_faces=faces, detected_person_regions=people,
-                  user_avoid_regions_normalized=list(user_regions or []), user_avoid_regions_pixels=user_avoid,
-                  detected_text_like_regions=avoid, corner_reserve_policy='four corners 17% width x 5.5% height; manual anchor bypasses reserves only',
-                  placement_mode='surface' if chosen['kind']=='hough_horizontal_support' else 'screen_sticker',
-                  ground_anchored=False, contact_shadow=False,
-                  haar_available=haar, hog_available=hog, warnings=warnings,
-                  union_bbox_source=dog['union_bbox'], whole_canvas_bounds_checked=True,
-                  actual_height_ratio=rh / H)
+    policy = 'detected-soft-authorized' if allow_partial_overlap else 'detected-hard'
+    warnings = ['稀疏人脸/文字启发式不能保证零遮挡；固定screen-sticker，无地面理解或跟随。']
+    if not haar:
+        warnings.append('本地Haar不可用，未做人脸检测，不下载模型。')
+    if allow_partial_overlap:
+        warnings.append('已显式授权：自动脸/文字保护为软惩罚，可部分遮挡；人工禁区和画面边界仍为硬约束。')
+    if chosen['minimum_canvas_edge_margin'] < .055:
+        warnings.append('内侧候选受限：使用有限边缘候选，不裁切动作。')
+    chosen.update(candidate_count=len(choices),best_candidate_count=len(shortlist),
+                  ranked_candidates=sorted(choices,key=lambda p:p['cost'])[:6], evaluated_sizes=evaluated,
+                  auto_size_range=[.24,.35] if ratio is None else None,size_mode='manual' if ratio else 'adaptive',
+                  requested_height_ratio=ratio,size_fallback=False,placement_mode='screen_sticker',
+                  ground_anchored=False,contact_shadow=False,whole_canvas_bounds_checked=True,
+                  union_bbox_source=dog['union_bbox'], detected_faces=faces,detected_text_like_regions=texts,
+                  detected_head_like_regions=heads,head_cue_policy='bounded compact/dark-band-cheek proposals; always soft',
+                  user_avoid_regions_normalized=user_regions,user_avoid_regions_pixels=manual,
+                  protection_policy=policy,partial_overlap_accepted=allow_partial_overlap,
+                  special_scene_fallback=allow_partial_overlap,protection_sample_count=len(frames),
+                  automatic_detection_overlap=chosen['detected_overlap'],
+                  protection_search_passes=1,temporal_relocation=False,haar_available=haar,
+                  edge_fallback=chosen['minimum_canvas_edge_margin']<.055,
+                  source_asset_resolution=[dog['width'],dog['height']],
+                  output_asset_resolution=[chosen['width'],chosen['height']],analysis_resolution=[sw,sh],
+                  selection_reason='一次有限35/30/24尺寸与内侧候选成本比较；人工禁区/完整画布硬约束。',warnings=warnings)
     return chosen
 
 
