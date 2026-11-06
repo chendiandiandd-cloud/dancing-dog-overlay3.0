@@ -13,9 +13,9 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 from shot_detection import ShotDetector
-from lightweight_vision import face_boxes, text_regions, head_regions
+from lightweight_vision import face_boxes, text_regions, head_regions, subject_proxy_zones, detect_horizontal_supports, subject_saliency_mask, detect_ground_regions
 
-ENGINE_VERSION = 'overlay-1.4.1'
+ENGINE_VERSION = 'overlay-1.4.2'
 HEIGHT_RATIO_MIN = .24
 HEIGHT_RATIO_MAX = .35
 
@@ -443,9 +443,10 @@ def placement(rgb, info, dog, ratio, mode, rng, explicit_anchor=None, extra_fram
               avoid_regions=None, allow_partial_overlap=False):
     """Single bounded size/location comparison. Manual exclusions always hard.
 
-    Without explicit authorization detected face/text rectangles are hard.
-    Authorization makes these automatic cues soft penalties in the SAME search,
-    not a retry stage; body/clothing inference and motion are not implemented.
+    In auto mode only evidence-backed support candidates are searched.
+    Detected face/text and body-proxy bounds are hard without authorization;
+    explicit partial overlap softens automatic subject cues, never the manual
+    exclusions or support requirement. Motion following is not implemented.
     """
     validate_height_ratio(ratio)
     W, H = info['display_width'], info['display_height']
@@ -468,13 +469,18 @@ def placement(rgb, info, dog, ratio, mode, rng, explicit_anchor=None, extra_fram
         return [[x*W/sw,y*H/sh,x2*W/sw,y2*H/sh]
                 for x,y,x2,y2 in dict.fromkeys(tuple(b) for b in boxes)]
     faces, texts = scaled(faces), scaled(texts)
+    proxies = subject_proxy_zones(heads, H, W)
+    supports = detect_horizontal_supports(rgb)
+    ground_regions = detect_ground_regions(rgb)
+    saliency_mask = subject_saliency_mask(rgb)
+
     gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY).astype(np.float32)/255
     grad = cv2.magnitude(cv2.Sobel(gray,cv2.CV_32F,1,0), cv2.Sobel(gray,cv2.CV_32F,0,1))
     cost_map = grad*.25 + np.abs(gray-float(gray.mean()))*.45
     integral = cv2.integral(cost_map)
     sizes = [ratio] if ratio is not None else [.35, .30, .24]
     choices = []
-    rejections = dict(bounds=0, user_region=0, face=0, text=0, below_size_floor=0)
+    rejections = dict(bounds=0, user_region=0, face=0, text=0, below_size_floor=0, no_support=0, subject=0, saliency=0)
     evaluated = []
     for requested in sizes:
         scale = min(H*requested/dog['height'], W*.88/dog['width'], H*.88/dog['height'])
@@ -482,7 +488,6 @@ def placement(rgb, info, dog, ratio, mode, rng, explicit_anchor=None, extra_fram
         ax, ay = dog['anchor'][0]*rw/dog['width'],dog['anchor'][1]*rh/dog['height']
         if explicit_anchor is not None:
             px, py = explicit_anchor[0]*W,explicit_anchor[1]*H
-            # Exact geometric fit at a fixed foot point; no iterative shrink/retry.
             limits = [1.]
             for room, need in ((px,ax),(W-px,rw-ax),(py,ay),(H-py,rh-ay)):
                 if need > 0:
@@ -490,23 +495,30 @@ def placement(rgb, info, dog, ratio, mode, rng, explicit_anchor=None, extra_fram
             fit = min(limits)
             rw, rh = max(1,math.floor(rw*fit)),max(1,math.floor(rh*fit))
             ax, ay = dog['anchor'][0]*rw/dog['width'],dog['anchor'][1]*rh/dog['height']
-            positions = [(round(px-ax),round(py-ay),'explicit_anchor')]
+            positions = [(round(px-ax),round(py-ay),'explicit_anchor', 0, 1.0)]
         else:
-            # Finite inner grid plus edge inset fallback, no dense special retries.
-            positions = [(round(cx*W-rw/2),round(cy*H-rh/2),'screen_sticker_inset')
-                         for cx in (.22,.40,.60,.78) for cy in (.38,.56,.74)]
-            positions += [(round(fx*max(0,W-rw)),round(fy*max(0,H-rh)),'screen_sticker')
-                          for fx in (.06,.50,.94) for fy in (.08,.50,.92)]
-            if mode == 'corner':
-                positions = [(round(fx*(W-rw)),round(fy*(H-rh)),'screen_sticker')
-                             for fx,fy in ((.06,.92),(.94,.92),(.06,.08),(.94,.08))]
-        # All paths share the same floor, including manual ratios and anchor fit.
-        # Integer round/floor may differ by at most one pixel, never more.
+            # ONLY ground anchored candidates in auto mode
+            positions = []
+            for s in supports:
+                x1, y1, x2, y2 = s['line']
+                for k in (0.2, 0.5, 0.8):
+                    px, py = x1 + k*(x2-x1), y1 + k*(y2-y1)
+                    positions.append((round(px*W/sw - ax), round(py*H/sh - ay), 'ground_anchored', py, s['score']))
+            for gr in ground_regions:
+                px, py = gr['anchor']
+                positions.append((round(px*W/sw - ax), round(py*H/sh - ay), 'ground_region', py, gr['score']))
+
+            if not positions:
+                rejections['no_support'] += 1
+                continue
+
+            # Corner preference cannot create unsupported sky/water anchors.
+
         if rh < H*HEIGHT_RATIO_MIN-1 or rh > H*HEIGHT_RATIO_MAX+1:
             rejections['below_size_floor'] += 1
             continue
         evaluated.append(requested)
-        for x,y,kind in dict.fromkeys(positions):
+        for x,y,kind,support_py,support_score in dict.fromkeys(positions):
             rect = [x,y,x+rw,y+rh]
             if x < 0 or y < 0 or rect[2] > W or rect[3] > H:
                 rejections['bounds'] += 1
@@ -514,40 +526,61 @@ def placement(rgb, info, dog, ratio, mode, rng, explicit_anchor=None, extra_fram
             if any(intersects(rect,b) for b in manual):
                 rejections['user_region'] += 1
                 continue
+
             face_hit, text_hit = any(intersects(rect,b) for b in faces),any(intersects(rect,b) for b in texts)
-            if not allow_partial_overlap and (face_hit or text_hit):
-                rejections['face' if face_hit else 'text'] += 1
-                continue
-            a,b,c,d = max(0,int(x*sw/W)),max(0,int(y*sh/H)),min(sw,math.ceil((x+rw)*sw/W)),min(sh,math.ceil((y+rh)*sh/H))
-            density = float((integral[d,c]-integral[b,c]-integral[d,a]+integral[b,a])/max(1,(c-a)*(d-b)))
+            subject_hit = any(intersects(rect, p) for p in proxies)
+
+            # Saliency check (non-person subject)
+            a_s,b_s,c_s,d_s = max(0,int(x*sw/W)),max(0,int(y*sh/H)),min(sw,math.ceil((x+rw)*sw/W)),min(sh,math.ceil((y+rh)*sh/H))
+            saliency_overlap = float(np.mean(saliency_mask[b_s:d_s, a_s:c_s] > 0)) if (d_s > b_s and c_s > a_s) else 0.
+
+            # HARD rejection for faces/text/subject/saliency unless authorized
+            if not allow_partial_overlap:
+                if face_hit or text_hit:
+                    rejections['face' if face_hit else 'text'] += 1
+                    continue
+                if subject_hit:
+                    rejections['subject'] += 1
+                    continue
+                if saliency_overlap > 0.4: # Soft limit for saliency to allow some background clutter
+                    rejections['saliency'] += 1
+                    continue
+
+            density = float((integral[d_s,c_s]-integral[b_s,c_s]-integral[d_s,a_s]+integral[b_s,a_s])/max(1,(c_s-a_s)*(d_s-b_s)))
             margins = [x/W,y/H,(W-x-rw)/W,(H-y-rh)/H]
             edge = min(margins)
-            # Penalize actual fraction of a small head cue covered, not global
-            # skin area. Even authorized partial overlap should strongly prefer
-            # an available candidate that does not cover a likely missed face.
+
+            # Extreme Sky/Water penalty for low-texture mid-upper regions
+            sky_penalty = 0.0
+            if y/H < 0.50 and density < 0.07:
+                sky_penalty = 20.0
+
             head_overlap = 0.
             for head in heads:
                 hx,hy,hx2,hy2 = head['box']
                 overlap = max(0,min(x+rw,hx2)-max(x,hx))*max(0,min(y+rh,hy2)-max(y,hy))
                 head_overlap = max(head_overlap,head['confidence']*overlap/max(1,(hx2-hx)*(hy2-hy)))
-            # Likely missed heads outrank incidental text/false-face costs;
-            # partial-scene permission is not a preference for covering a face.
+
             head_penalty = 8.0 * head_overlap
-            soft = float(face_hit)*2. + float(text_hit)*1.5 + head_penalty
-            cost = density + soft + 1.0*max(0.,.35-rh/H) + .25*max(0.,.06-edge)/.06 + .08*max(0.,.70-(y+ay)/H)
+            soft = float(face_hit)*3. + float(text_hit)*2.0 + head_penalty + float(subject_hit)*8.0 + saliency_overlap*4.0 + sky_penalty
+            cost = density + soft + 1.0*max(0.,.35-rh/H) + .25*max(0.,.06-edge)/.06 - support_score
+
             choices.append(dict(x=x,y=y,width=rw,height=rh,anchor_pixel=[x+ax,y+ay],
                                 anchor_normalized=[(x+ax)/W,(y+ay)/H], actual_height_ratio=rh/H,
                                 evaluated_height_ratio=requested, cost=cost,joint_cost=cost,kind=kind,
+                                ground_kind=kind, support_y=support_py/sh, support_score=support_score,
                                 automatic_overlap_penalty=soft, head_cue_overlap_penalty=head_penalty,
                                 head_cue_overlap_fraction=head_overlap, detected_overlap=bool(face_hit or text_hit),
                                 canvas_edge_margins_normalized=margins,minimum_canvas_edge_margin=edge))
     if not choices:
-        raise PlacementError('无合法位：须满足24%–35%尺寸（最多1像素取整容差）、完整动作边界、人工禁区及当前脸/文字保护策略',rejections)
+        raise PlacementError('无法找到满足硬性地面支撑与主体避让要求的落点。',rejections)
+
     best = min(p['cost'] for p in choices)
-    shortlist = [p for p in choices if p['cost'] <= best+.015]
+    shortlist = [p for p in choices if p['cost'] <= best+.03]
     chosen = dict(rng.choice(shortlist))
     policy = 'detected-soft-authorized' if allow_partial_overlap else 'detected-hard'
-    warnings = ['稀疏人脸/文字启发式不能保证零遮挡；固定screen-sticker，无地面理解或跟随。']
+    ground_anchored = (chosen['kind'] in ('ground_anchored', 'ground_region'))
+    warnings = ['严格支撑与主体保护模式；' + ('地面锚定成功' if ground_anchored else '手动/角落落位')]
     if not haar:
         warnings.append('本地Haar不可用，未做人脸检测，不下载模型。')
     if allow_partial_overlap:
@@ -557,8 +590,8 @@ def placement(rgb, info, dog, ratio, mode, rng, explicit_anchor=None, extra_fram
     chosen.update(candidate_count=len(choices),best_candidate_count=len(shortlist),
                   ranked_candidates=sorted(choices,key=lambda p:p['cost'])[:6], evaluated_sizes=evaluated,
                   auto_size_range=[.24,.35] if ratio is None else None,size_mode='manual' if ratio else 'adaptive',
-                  requested_height_ratio=ratio,size_fallback=False,placement_mode='screen_sticker',
-                  ground_anchored=False,contact_shadow=False,whole_canvas_bounds_checked=True,
+                  requested_height_ratio=ratio,size_fallback=False,placement_mode='fixed_ground_anchor' if ground_anchored else 'explicit_anchor',
+                  ground_anchored=ground_anchored,contact_shadow=False,whole_canvas_bounds_checked=True,
                   union_bbox_source=dog['union_bbox'], detected_faces=faces,detected_text_like_regions=texts,
                   detected_head_like_regions=heads,head_cue_policy='bounded compact/dark-band-cheek proposals; always soft',
                   user_avoid_regions_normalized=user_regions,user_avoid_regions_pixels=manual,
@@ -585,8 +618,11 @@ class PreparedDog:
             self.cache.move_to_end(index)
             return self.cache[index]
         src = self.dog['frames'][index].astype(np.float32) / 255
+        rgb = src[:, :, :3]
         alpha = src[:, :, 3:4]
-        premul = np.concatenate([src[:, :, :3] * alpha, alpha], axis=2)
+        from edge_cleanup import cleanup_edge_rgb
+        rgb, alpha = cleanup_edge_rgb(rgb, alpha)
+        premul = np.concatenate([rgb * alpha, alpha], axis=2)
         size = (self.position['width'], self.position['height'])
         # High-quality sampling in premultiplied space. Bound Lanczos ringing to
         # valid associated-alpha colors, so invisible RGB/negative lobes cannot fringe.
