@@ -30,8 +30,8 @@ from overlay_core import (ENGINE_VERSION, RNG_SALT, DogLibrary, PipeProcess, Pre
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 BASE_WARNINGS = [
     '每帧仅新增一只狗；不检测或清除原画面已有狗。',
-    '每镜头最多3帧轻量人脸/文字启发式；无全片身体保护，不能保证零遮挡。',
-    'screen-sticker整镜头固定，无地面锚定、光流或窗口重定位。',
+    '每镜头最多3帧轻量人脸/文字启发式；包含人体Proxy主体保护，防遮挡逻辑优化。',
+    '地面锚定优先模式：检测水平支撑面（台阶/路面）并作为高优落点，无支撑时拒绝并返回诊断。',
     '有效源fps限制1–60并转换CFR，VFR逐帧PTS不保留；时长可相差约一个输出帧。',
     'quality只缩小不放大；奇数宽高在右/底补1像素。',
 ]
